@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小家族基金管理系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .profit-green { color: #16a34a; } /* 獲利綠色 */
+        .loss-red { color: #dc2626; }    /* 虧損紅色 */
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <!-- 頂部導航 -->
+    <nav class="bg-gray-800 text-white p-4 shadow-md">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">小家族基金系統</h1>
+            <div class="space-x-4 text-sm">
+                <a href="#" class="hover:text-gray-300 font-bold border-b-2 border-white pb-1">交易輸入</a>
+                <a href="#" class="hover:text-gray-300 text-gray-400">總覽看板</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto mt-6 p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- 左側：交易輸入表單 -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-lg font-bold mb-4 border-b pb-2">新增交易</h2>
+            <form id="transactionForm" class="space-y-4">
+                
+                <div class="flex space-x-4">
+                    <label class="flex-1 block">
+                        <span class="text-gray-700 text-sm">交易類型</span>
+                        <select id="txType" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50 focus:ring-blue-500">
+                            <option value="買入">買入 (Buy)</option>
+                            <option value="賣出">賣出 (Sell)</option>
+                        </select>
+                    </label>
+                    <label class="flex-1 block">
+                        <span class="text-gray-700 text-sm">日期</span>
+                        <input type="date" id="txDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50">
+                    </label>
+                </div>
+
+                <div class="flex space-x-4">
+                    <label class="flex-1 block">
+                        <span class="text-gray-700 text-sm">股票代號 (如: 0700)</span>
+                        <input type="text" id="txTicker" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                    </label>
+                    <label class="flex-1 block">
+                        <span class="text-gray-700 text-sm">券商</span>
+                        <select id="txBroker" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                            <option value="富途牛牛">富途牛牛</option>
+                            <option value="HSBC">匯豐 (HSBC)</option>
+                            <option value="手動">手動輸入</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="flex space-x-4">
+                    <label class="flex-1 block">
+                        <span class="text-gray-700 text-sm">股價 ($)</span>
+                        <input type="number" id="txPrice" step="0.001" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                    </label>
+                    <label class="flex-1 block">
+                        <span class="text-gray-700 text-sm">股數</span>
+                        <input type="number" id="txQty" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                    </label>
+                </div>
+
+                <!-- 預計對沖成本 (僅賣出時顯示，模擬後端抓取) -->
+                <div id="costMatchDiv" class="hidden bg-blue-50 p-3 rounded text-sm text-blue-800 mt-2">
+                    <span>⚠️ 賣出對沖預覽：系統將自動尋找成本最低之持倉進行沖銷。此處可手動輸入預估成本價以預覽利潤。</span>
+                    <input type="number" id="estCostPrice" step="0.001" placeholder="輸入買入成本預覽利潤" class="mt-2 block w-full rounded border-blue-200 p-1">
+                </div>
+
+                <button type="button" onclick="submitData()" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">
+                    確認送出至資料庫
+                </button>
+            </form>
+        </div>
+
+        <!-- 右側：即時預覽面板 (參考您提供的截圖風格) -->
+        <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-gray-800">
+            <div class="text-center mb-6">
+                <p class="text-sm text-gray-500" id="previewTitle">預估交易總額與費用</p>
+                <!-- 大字利潤/金額顯示區 -->
+                <div id="mainHighlight" class="text-3xl font-bold mt-2 text-gray-800">
+                    $0.00
+                </div>
+                <div id="profitHighlight" class="text-xl font-bold mt-1 hidden">
+                    <!-- 利潤 % 會顯示在這裡 -->
+                </div>
+            </div>
+
+            <!-- 費用明細表 -->
+            <table class="w-full text-sm text-right">
+                <thead>
+                    <tr class="text-gray-500 border-b">
+                        <th class="text-left py-2 font-normal">費用項目</th>
+                        <th class="py-2 font-normal" id="feeColTitle">預估金額</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-700" id="feeTableBody">
+                    <tr><td class="text-left py-2">股票淨值</td><td id="valNet">0.00</td></tr>
+                    <tr><td class="text-left py-2">印花稅 (0.1%)</td><td id="valStamp">0.00</td></tr>
+                    <tr><td class="text-left py-2">證監/財匯局徵費</td><td id="valSfc">0.00</td></tr>
+                    <tr><td class="text-left py-2">結算費</td><td id="valCcass">0.00</td></tr>
+                    <tr><td class="text-left py-2">佣金</td><td id="valComm">0.00</td></tr>
+                    <tr><td class="text-left py-2">平台使用費</td><td id="valPlat">0.00</td></tr>
+                    <tr class="border-t font-bold text-gray-900">
+                        <td class="text-left py-3">總費用</td><td id="valTotalFee">0.00</td>
+                    </tr>
+                    <tr class="border-t font-bold text-lg">
+                        <td class="text-left py-3 text-gray-900" id="finalTotalLabel">實際總額</td>
+                        <td id="valFinalTotal" class="text-gray-900">0.00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- 互動與計算邏輯 -->
+    <script>
+        // 取得當天日期並預填
+        document.getElementById('txDate').valueAsDate = new Date();
+
+        // 綁定所有輸入框的事件，一有變動就重新計算預覽
+        const inputs = ['txType', 'txPrice', 'txQty', 'txBroker', 'estCostPrice'];
+        inputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', updatePreview);
+        });
+
+        // 監聽買賣類型，動態顯示/隱藏利潤對沖預覽區
+        document.getElementById('txType').addEventListener('change', function(e) {
+            if(e.target.value === '賣出') {
+                document.getElementById('costMatchDiv').classList.remove('hidden');
+                document.getElementById('previewTitle').innerText = "預估賣出淨回報與利潤";
+            } else {
+                document.getElementById('costMatchDiv').classList.add('hidden');
+                document.getElementById('previewTitle').innerText = "預估買入總成本";
+                document.getElementById('profitHighlight').classList.add('hidden');
+            }
+        });
+
+        // 核心計算函數 (移植自您的要求與GAS邏輯)
+        function updatePreview() {
+            const type = document.getElementById('txType').value;
+            const price = parseFloat(document.getElementById('txPrice').value) || 0;
+            const qty = parseFloat(document.getElementById('txQty').value) || 0;
+            const broker = document.getElementById('txBroker').value;
+            const estCost = parseFloat(document.getElementById('estCostPrice').value) || 0;
+
+            if (price === 0 || qty === 0) return;
+
+            const netValue = price * qty;
+            
+            // 香港股票規費計算
+            let stampDuty = 0, sfcLevy = 0, ccassFee = 0, commission = 0, platformFee = 0, tradingFee = 0;
+
+            if (broker !== "手動") {
+                stampDuty = Math.ceil(netValue * 0.001);
+                tradingFee = netValue * 0.0000565;
+                sfcLevy = netValue * 0.000027 + netValue * 0.0000015; // 證監 + 財匯局
+                ccassFee = Math.max(2, netValue * 0.00002);
+                
+                if (broker === "富途牛牛") {
+                    commission = Math.max(3, netValue * 0.0003);
+                    platformFee = 15;
+                } else if (broker === "HSBC") {
+                    commission = Math.max(100, netValue * 0.0025);
+                    platformFee = 0;
+                }
+            }
+
+            const totalFee = stampDuty + tradingFee + sfcLevy + ccassFee + commission + platformFee;
+            const finalTotal = type === "買入" ? (netValue + totalFee) : (netValue - totalFee);
+
+            // 更新介面數字
+            document.getElementById('valNet').innerText = netValue.toFixed(2);
+            document.getElementById('valStamp').innerText = stampDuty.toFixed(2);
+            document.getElementById('valSfc').innerText = (sfcLevy + tradingFee).toFixed(2);
+            document.getElementById('valCcass').innerText = ccassFee.toFixed(2);
+            document.getElementById('valComm').innerText = commission.toFixed(2);
+            document.getElementById('valPlat').innerText = platformFee.toFixed(2);
+            document.getElementById('valTotalFee').innerText = totalFee.toFixed(2);
+            
+            document.getElementById('finalTotalLabel').innerText = type === "買入" ? "應付總額" : "實收總額";
+            document.getElementById('valFinalTotal').innerText = finalTotal.toFixed(2);
+
+            // 大字顯示區更新
+            document.getElementById('mainHighlight').innerText = "$" + finalTotal.toFixed(2);
+            document.getElementById('mainHighlight').className = "text-3xl font-bold mt-2 " + (type === "賣出" ? "profit-green" : "loss-red");
+
+            // 賣出時的利潤預覽邏輯 (模擬最低成本對沖)
+            if (type === "賣出" && estCost > 0) {
+                const buyNet = estCost * qty;
+                // 粗估買入手續費 (假設當時也是用同券商)
+                const estBuyFee = broker === "富途牛牛" ? Math.max(3, buyNet*0.0003) + 15 + Math.ceil(buyNet*0.001) : 0; 
+                const totalCost = buyNet + estBuyFee;
+                
+                const profitAmount = finalTotal - totalCost;
+                const profitPercent = (profitAmount / totalCost) * 100;
+
+                const profitEl = document.getElementById('profitHighlight');
+                profitEl.classList.remove('hidden');
+                
+                if (profitAmount >= 0) {
+                    profitEl.innerHTML = `+${profitAmount.toFixed(2)} (+${profitPercent.toFixed(2)}%)`;
+                    profitEl.className = "text-2xl font-bold mt-1 profit-green";
+                } else {
+                    profitEl.innerHTML = `${profitAmount.toFixed(2)} (${profitPercent.toFixed(2)}%)`;
+                    profitEl.className = "text-2xl font-bold mt-1 loss-red";
+                }
+            }
+        }
+
+        // 送出資料到 Google Apps Script API
+        function submitData() {
+            // 【重要】請將下方 URL 替換為您的 Apps Script 部署網址
+            const GOOGLE_APP_SCRIPT_URL = 'YOUR_WEB_APP_URL_HERE'; 
+
+            const data = {
+                action: "addTransaction",
+                tx: {
+                    type: document.getElementById('txType').value,
+                    date: document.getElementById('txDate').value,
+                    ticker: document.getElementById('txTicker').value,
+                    price: parseFloat(document.getElementById('txPrice').value),
+                    quantity: parseFloat(document.getElementById('txQty').value),
+                    broker: document.getElementById('txBroker').value
+                }
+            };
+
+            // 簡單驗證
+            if(!data.tx.ticker || !data.tx.price || !data.tx.quantity) {
+                alert("請填寫完整的股票代號、價格與股數！");
+                return;
+            }
+
+            // 改變按鈕狀態
+            const btn = document.querySelector('button');
+            btn.innerText = "處理中...";
+            btn.disabled = true;
+
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // 避免跨域問題的簡單設定
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(() => {
+                alert('交易已成功送出！');
+                btn.innerText = "確認送出至資料庫";
+                btn.disabled = false;
+                document.getElementById('transactionForm').reset();
+                document.getElementById('txDate').valueAsDate = new Date();
+                updatePreview();
+            })
+            .catch(error => {
+                alert('傳送失敗，請檢查網路或 API 網址。');
+                btn.innerText = "確認送出至資料庫";
+                btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
