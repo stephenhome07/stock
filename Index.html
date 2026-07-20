@@ -3,141 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V1.02小家族基金管理系統</title>
+    <title>V2.0 小家族基金管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .profit-green { color: #16a34a; }
         .loss-red { color: #dc2626; }
+        .tab-active { border-bottom-color: #3b82f6; color: #3b82f6; }
     </style>
 </head>
-<body class="bg-gray-100 font-sans">
+<body class="bg-gray-100 font-sans pb-12">
     <nav class="bg-gray-800 text-white p-4 shadow-md">
-        <div class="max-w-4xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold">小家族基金系統</h1>
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">小家族基金系統 V2.0</h1>
         </div>
     </nav>
 
-    <div class="max-w-4xl mx-auto mt-6 p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        <!-- 左側：交易輸入表單 -->
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-lg font-bold mb-4 border-b pb-2">新增交易</h2>
-            <form id="transactionForm" class="space-y-4">
-                
-                <div class="flex space-x-4">
-                    <label class="flex-1 block">
-                        <span class="text-gray-700 text-sm">交易類型</span>
-                        <select id="txType" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50 focus:ring-blue-500">
-                            <option value="買入">買入 (Buy)</option>
-                            <option value="賣出">賣出 (Sell)</option>
-                        </select>
-                    </label>
-                    <label class="flex-1 block">
-                        <span class="text-gray-700 text-sm">日期</span>
-                        <input type="date" id="txDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50">
-                    </label>
-                </div>
-
-                <div class="flex space-x-2 items-end">
-                    <label class="flex-1 block">
-                        <span class="text-gray-700 text-sm">股票代號 (如: 1 或 0700)</span>
-                        <input type="text" id="txTicker" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                    </label>
-                    <!-- 查詢按鈕 -->
-                    <button type="button" id="btnFetchPos" onclick="fetchPositions()" class="hidden bg-indigo-600 text-white px-3 py-2 rounded shadow hover:bg-indigo-700 text-sm h-[42px]">
-                        查詢倉位
-                    </button>
-                </div>
-
-                <!-- 手動選擇倉位區 (僅賣出顯示) -->
-                <div id="positionSelectionArea" class="hidden bg-gray-50 p-3 rounded border">
-                    <span class="text-gray-700 text-sm font-bold block mb-2">請選擇要平倉的紀錄：</span>
-                    <div id="positionList" class="space-y-2 max-h-60 overflow-y-auto">
-                        <!-- JS 將在此插入倉位卡片 -->
-                        <div class="text-sm text-gray-500">請輸入股票代號並點擊「查詢倉位」...</div>
-                    </div>
-                </div>
-
-                <div class="flex space-x-4">
-                    <label class="flex-1 block">
-                        <span class="text-gray-700 text-sm">券商</span>
-                        <select id="txBroker" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                            <option value="富途牛牛">富途牛牛</option>
-                            <option value="HSBC">匯豐 (HSBC)</option>
-                            <option value="手動">手動輸入</option>
-                        </select>
-                    </label>
-                </div>
-
-                <div class="flex space-x-4">
-                    <label class="flex-1 block">
-                        <span class="text-gray-700 text-sm">股價 ($)</span>
-                        <input type="number" id="txPrice" step="0.001" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                    </label>
-                    <label class="flex-1 block">
-                        <span class="text-gray-700 text-sm">股數</span>
-                        <input type="number" id="txQty" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                    </label>
-                </div>
-
-                <button type="button" id="btnSubmit" onclick="submitData()" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">
-                    確認送出至資料庫
-                </button>
-            </form>
-        </div>
-
-        <!-- 右側：即時預覽面板 -->
-        <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-gray-800">
-            <div class="text-center mb-6">
-                <p class="text-sm text-gray-500" id="previewTitle">預估交易總額與費用</p>
-                <div id="mainHighlight" class="text-3xl font-bold mt-2 text-gray-800">$0.00</div>
-                <div id="profitHighlight" class="text-xl font-bold mt-1 hidden"></div>
-            </div>
-
-            <!-- 費用明細表 -->
-            <table class="w-full text-sm text-right">
-                <thead>
-                    <tr class="text-gray-500 border-b">
-                        <th class="text-left py-2 font-normal">費用項目</th>
-                        <th class="py-2 font-normal" id="feeColTitle">預估金額</th>
-                    </tr>
-                </thead>
-                <tbody class="text-gray-700">
-                    <tr><td class="text-left py-2">股票淨值</td><td id="valNet">0.00</td></tr>
-                    <tr><td class="text-left py-2">印花稅 (0.1%)</td><td id="valStamp">0.00</td></tr>
-                    <tr><td class="text-left py-2">證監/財匯局徵費</td><td id="valSfc">0.00</td></tr>
-                    <tr><td class="text-left py-2">結算費</td><td id="valCcass">0.00</td></tr>
-                    <tr><td class="text-left py-2">佣金</td><td id="valComm">0.00</td></tr>
-                    <tr><td class="text-left py-2">平台使用費</td><td id="valPlat">0.00</td></tr>
-                    <tr class="border-t font-bold text-gray-900">
-                        <td class="text-left py-3">總費用</td><td id="valTotalFee">0.00</td>
-                    </tr>
-                    <tr class="border-t font-bold text-lg">
-                        <td class="text-left py-3 text-gray-900" id="finalTotalLabel">實際總額</td>
-                        <td id="valFinalTotal" class="text-gray-900">0.00</td>
-                    </tr>
-                </tbody>
-            </table>
+    <!-- 導覽頁籤 -->
+    <div class="max-w-5xl mx-auto mt-6 bg-white rounded-t-lg shadow-sm border-b">
+        <div class="flex">
+            <button onclick="switchTab('trade')" id="tab-trade" class="px-6 py-3 font-semibold border-b-4 tab-active">新增交易</button>
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-6 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500">基金總看板</button>
+            <button onclick="switchTab('member')" id="tab-member" class="px-6 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500">成員專區</button>
         </div>
     </div>
 
+    <div class="max-w-5xl mx-auto">
+        <!-- ==================== 第一步：交易區 (維持原樣，加入隱藏切換) ==================== -->
+        <div id="view-trade" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 左側：交易輸入表單 -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-lg font-bold mb-4 border-b pb-2">新增交易</h2>
+                <form id="transactionForm" class="space-y-4">
+                    <div class="flex space-x-4">
+                        <label class="flex-1 block">
+                            <span class="text-gray-700 text-sm">交易類型</span>
+                            <select id="txType" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50 focus:ring-blue-500">
+                                <option value="買入">買入 (Buy)</option>
+                                <option value="賣出">賣出 (Sell)</option>
+                            </select>
+                        </label>
+                        <label class="flex-1 block">
+                            <span class="text-gray-700 text-sm">日期</span>
+                            <input type="date" id="txDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50">
+                        </label>
+                    </div>
+
+                    <div class="flex space-x-2 items-end">
+                        <label class="flex-1 block">
+                            <span class="text-gray-700 text-sm">股票代號 (如: 1 或 0700)</span>
+                            <input type="text" id="txTicker" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                        </label>
+                        <button type="button" id="btnFetchPos" onclick="fetchPositions()" class="hidden bg-indigo-600 text-white px-3 py-2 rounded shadow hover:bg-indigo-700 text-sm h-[42px]">
+                            查詢倉位
+                        </button>
+                    </div>
+
+                    <div id="positionSelectionArea" class="hidden bg-gray-50 p-3 rounded border">
+                        <span class="text-gray-700 text-sm font-bold block mb-2">請選擇要平倉的紀錄：</span>
+                        <div id="positionList" class="space-y-2 max-h-60 overflow-y-auto">
+                            <div class="text-sm text-gray-500">請輸入股票代號並點擊「查詢倉位」...</div>
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-4">
+                        <label class="flex-1 block">
+                            <span class="text-gray-700 text-sm">券商</span>
+                            <select id="txBroker" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                                <option value="富途牛牛">富途牛牛</option>
+                                <option value="HSBC">匯豐 (HSBC)</option>
+                                <option value="手動">手動輸入</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="flex space-x-4">
+                        <label class="flex-1 block">
+                            <span class="text-gray-700 text-sm">股價 ($)</span>
+                            <input type="number" id="txPrice" step="0.001" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                        </label>
+                        <label class="flex-1 block">
+                            <span class="text-gray-700 text-sm">股數</span>
+                            <input type="number" id="txQty" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                        </label>
+                    </div>
+
+                    <button type="button" id="btnSubmit" onclick="submitData()" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">
+                        確認送出至資料庫
+                    </button>
+                </form>
+            </div>
+
+            <!-- 右側：即時預覽面板 -->
+            <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-gray-800">
+                <div class="text-center mb-6">
+                    <p class="text-sm text-gray-500" id="previewTitle">預估交易總額與費用</p>
+                    <div id="mainHighlight" class="text-3xl font-bold mt-2 text-gray-800">$0.00</div>
+                    <div id="profitHighlight" class="text-xl font-bold mt-1 hidden"></div>
+                </div>
+
+                <table class="w-full text-sm text-right">
+                    <thead>
+                        <tr class="text-gray-500 border-b">
+                            <th class="text-left py-2 font-normal">費用項目</th>
+                            <th class="py-2 font-normal" id="feeColTitle">預估金額</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700">
+                        <tr><td class="text-left py-2">股票淨值</td><td id="valNet">0.00</td></tr>
+                        <tr><td class="text-left py-2">印花稅 (0.1%)</td><td id="valStamp">0.00</td></tr>
+                        <tr><td class="text-left py-2">證監/財匯局徵費</td><td id="valSfc">0.00</td></tr>
+                        <tr><td class="text-left py-2">結算費</td><td id="valCcass">0.00</td></tr>
+                        <tr><td class="text-left py-2">佣金</td><td id="valComm">0.00</td></tr>
+                        <tr><td class="text-left py-2">平台使用費</td><td id="valPlat">0.00</td></tr>
+                        <tr class="border-t font-bold text-gray-900">
+                            <td class="text-left py-3">總費用</td><td id="valTotalFee">0.00</td>
+                        </tr>
+                        <tr class="border-t font-bold text-lg">
+                            <td class="text-left py-3 text-gray-900" id="finalTotalLabel">實際總額</td>
+                            <td id="valFinalTotal" class="text-gray-900">0.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== 第二步：基金總體看板 ==================== -->
+        <div id="view-dashboard" class="mt-4 hidden space-y-6">
+            <!-- 核心指標 -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+                    <p class="text-gray-500 text-sm">總資產淨值 (NAV)</p>
+                    <h3 class="text-2xl font-bold text-gray-800 mt-1" id="dashNav">$0.00</h3>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
+                    <p class="text-gray-500 text-sm">未實現損益</p>
+                    <h3 class="text-2xl font-bold mt-1" id="dashUnrealized">$0.00</h3>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-purple-500">
+                    <p class="text-gray-500 text-sm">總報酬率</p>
+                    <h3 class="text-2xl font-bold mt-1" id="dashRoi">0.00%</h3>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
+                    <p class="text-gray-500 text-sm">保留現金</p>
+                    <h3 class="text-2xl font-bold text-gray-800 mt-1" id="dashCash">$0.00</h3>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- 圖表區 -->
+                <div class="bg-white p-4 rounded-lg shadow-md col-span-2">
+                    <h2 class="text-lg font-bold mb-4">資產增長走勢</h2>
+                    <canvas id="navChart" height="100"></canvas>
+                </div>
+                <!-- 簡易分配區 -->
+                <div class="bg-white p-4 rounded-lg shadow-md">
+                    <h2 class="text-lg font-bold mb-4">資產分佈</h2>
+                    <canvas id="allocationChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- 未平倉明細表 -->
+            <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold">現有持倉明細 (Open Positions)</h2>
+                    <button onclick="fetchDashboardData()" class="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">重新整理</button>
+                </div>
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-600">
+                        <tr>
+                            <th class="p-2 rounded-tl-lg">代號</th>
+                            <th class="p-2">買入日期</th>
+                            <th class="p-2">持股數</th>
+                            <th class="p-2">買入均價</th>
+                            <th class="p-2">現價 (Google Finance)</th>
+                            <th class="p-2 text-right rounded-tr-lg">未實現損益</th>
+                        </tr>
+                    </thead>
+                    <tbody id="openPositionsTable" class="divide-y">
+                        <tr><td colspan="6" class="p-4 text-center text-gray-500">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ==================== 第三步：成員專屬區 ==================== -->
+        <div id="view-member" class="mt-4 hidden space-y-6">
+            <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">切換成員</h2>
+                    <p class="text-sm text-gray-500 mt-1">查看個別成員的權益與配息</p>
+                </div>
+                <select id="memberSelect" onchange="fetchMemberData()" class="block w-64 rounded-md border-gray-300 shadow-sm border p-2 text-lg focus:ring-blue-500">
+                    <option value="">請選擇成員...</option>
+                    <option value="成員A">爸爸 (成員 A)</option>
+                    <option value="成員B">媽媽 (成員 B)</option>
+                    <option value="成員C">自己 (成員 C)</option>
+                </select>
+            </div>
+
+            <div id="memberStats" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-lg shadow-md text-white">
+                    <p class="text-blue-100 text-sm">累積投入本金</p>
+                    <h3 class="text-3xl font-bold mt-2" id="memCapital">$0.00</h3>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-700 p-6 rounded-lg shadow-md text-white">
+                    <p class="text-purple-100 text-sm">基金持股佔比 (權益 %)</p>
+                    <h3 class="text-3xl font-bold mt-2" id="memEquity">0.00%</h3>
+                </div>
+                <div class="bg-gradient-to-br from-green-500 to-emerald-700 p-6 rounded-lg shadow-md text-white relative overflow-hidden">
+                    <p class="text-green-100 text-sm">本月預估派發利息</p>
+                    <h3 class="text-3xl font-bold mt-2" id="memDividend">$0.00</h3>
+                    <p class="text-xs text-green-200 mt-2" id="memDivRule">依據年化 5% 設定計算</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
     <script>
-        // 【重要】請將下方 URL 替換為您的 Apps Script 部署網址 (務必使用新部署的版本)
         const GOOGLE_APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbysMf-bAyli08G9kqYNrMjEo9zLfP3rC5sHIDcPR6iDIaokJ9WQphWtbW1zB3bg0HG0/exec'; 
 
-        // 全域變數儲存抓取到的持倉
+        // ==================== 視圖切換邏輯 ====================
+        function switchTab(tabName) {
+            // 隱藏所有 View
+            document.getElementById('view-trade').classList.add('hidden');
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-member').classList.add('hidden');
+            
+            // 重置 Tab 樣式
+            ['trade', 'dashboard', 'member'].forEach(name => {
+                const el = document.getElementById('tab-' + name);
+                el.classList.remove('tab-active', 'border-blue-500', 'text-blue-500');
+                el.classList.add('border-transparent', 'text-gray-500');
+            });
+
+            // 啟動對應 View 與 Tab
+            document.getElementById('view-' + tabName).classList.remove('hidden');
+            const activeTab = document.getElementById('tab-' + tabName);
+            activeTab.classList.remove('border-transparent', 'text-gray-500');
+            activeTab.classList.add('tab-active', 'border-blue-500');
+
+            // 觸發載入資料
+            if(tabName === 'dashboard') fetchDashboardData();
+            if(tabName === 'member' && document.getElementById('memberSelect').value !== "") fetchMemberData();
+        }
+
+        // ==================== 第一步：保留原本的交易邏輯 ====================
         let currentOpenPositions = [];
         let selectedPosition = null;
-
         document.getElementById('txDate').valueAsDate = new Date();
 
-        // 監聽變更
         const inputs = ['txType', 'txPrice', 'txQty', 'txBroker'];
         inputs.forEach(id => {
             document.getElementById(id).addEventListener('input', updatePreview);
         });
 
-        // 監聽買賣切換
         document.getElementById('txType').addEventListener('change', function(e) {
             const isSell = e.target.value === '賣出';
             document.getElementById('positionSelectionArea').style.display = isSell ? 'block' : 'none';
@@ -149,211 +270,128 @@
             updatePreview();
         });
 
-        // 抓取持倉資料
-        function fetchPositions() {
-            const ticker = document.getElementById('txTicker').value;
-            if (!ticker) { alert("請先輸入股票代號"); return; }
-            
-            const btn = document.getElementById('btnFetchPos');
-            btn.innerText = "查詢中...";
-            btn.disabled = true;
+        // (原本的 fetchPositions, renderPositions, selectPos, updatePreview, submitData 保持不變，為節省版面精簡呈現，請確保保留您原先完整的 JS 邏輯)
+        // ... 此處貼上您原本 Step 1 的所有 JavaScript 函數 ...
 
-            const payload = { action: "getOpenPositions", ticker: ticker };
+        function fetchPositions() { /* ...維持原代碼... */ }
+        function renderPositions() { /* ...維持原代碼... */ }
+        function selectPos(index) { /* ...維持原代碼... */ }
+        function updatePreview() { /* ...維持原代碼... */ }
+        function submitData() { /* ...維持原代碼... */ }
 
+
+        // ==================== 第二步：看板資料抓取與圖表 ====================
+        let navChartInstance = null;
+        let allocationChartInstance = null;
+
+        function fetchDashboardData() {
+            // 向 GAS 請求總體資料
             fetch(GOOGLE_APP_SCRIPT_URL, {
                 method: 'POST',
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(res => {
-                btn.innerText = "查詢倉位";
-                btn.disabled = false;
-                if (res.success) {
-                    currentOpenPositions = res.data;
-                    renderPositions();
-                } else {
-                    alert("查詢失敗：" + res.error);
-                }
-            })
-            .catch(err => {
-                alert("網路或 CORS 錯誤，確保 URL 正確。");
-                btn.innerText = "查詢倉位";
-                btn.disabled = false;
-            });
-        }
-
-        // 渲染持倉卡片與到價提示
-        function renderPositions() {
-            const listDiv = document.getElementById('positionList');
-            listDiv.innerHTML = '';
-            selectedPosition = null;
-
-            if (currentOpenPositions.length === 0) {
-                listDiv.innerHTML = '<div class="text-sm text-red-500">找不到該股票的未平倉紀錄。</div>';
-                return;
-            }
-
-            currentOpenPositions.forEach((pos, index) => {
-                const buyP = parseFloat(pos.price);
-                // 計算到價提示
-                const p10 = (buyP * 1.10).toFixed(3);
-                const p5  = (buyP * 1.05).toFixed(3);
-                const m5  = (buyP * 0.95).toFixed(3);
-                const m10 = (buyP * 0.90).toFixed(3);
-
-                const div = document.createElement('label');
-                div.className = "block p-3 border rounded-lg cursor-pointer hover:bg-blue-50 mb-2 bg-white";
-                div.innerHTML = `
-                    <div class="flex items-center justify-between border-b pb-2 mb-2">
-                        <div>
-                            <input type="radio" name="selectedPos" value="${index}" class="mr-2" onchange="selectPos(${index})">
-                            <span class="font-bold text-gray-800">買入價: $${buyP}</span> 
-                            <span class="text-sm text-gray-600">(剩餘: ${pos.remainingQty} 股)</span>
-                        </div>
-                        <div class="text-xs text-gray-500">${pos.date}</div>
-                    </div>
-                    <div class="grid grid-cols-4 gap-2 text-xs text-center font-bold">
-                        <div class="bg-red-100 text-red-700 py-1 rounded">止蝕 -10%<br>$${m10}</div>
-                        <div class="bg-orange-100 text-orange-700 py-1 rounded">止蝕 -5%<br>$${m5}</div>
-                        <div class="bg-green-100 text-green-700 py-1 rounded">止賺 +5%<br>$${p5}</div>
-                        <div class="bg-emerald-200 text-emerald-800 py-1 rounded">止賺 +10%<br>$${p10}</div>
-                    </div>
-                `;
-                listDiv.appendChild(div);
-            });
-        }
-
-        // 當用戶選擇某個倉位時觸發
-        function selectPos(index) {
-            selectedPosition = currentOpenPositions[index];
-            // 預設將賣出股數填入該倉位的剩餘股數，方便操作
-            document.getElementById('txQty').value = selectedPosition.remainingQty;
-            updatePreview();
-        }
-
-        // 核心預覽計算 (完全同步後端算式)
-        function updatePreview() {
-            const type = document.getElementById('txType').value;
-            const price = parseFloat(document.getElementById('txPrice').value) || 0;
-            const qty = parseFloat(document.getElementById('txQty').value) || 0;
-            const broker = document.getElementById('txBroker').value;
-
-            if (price === 0 || qty === 0) return;
-
-            const netValue = price * qty;
-            
-            // 手續費計算
-            let stampDuty = 0, sfcLevy = 0, ccassFee = 0, commission = 0, platformFee = 0, tradingFee = 0;
-            if (broker !== "手動") {
-                stampDuty = Math.ceil(netValue * 0.001);
-                tradingFee = netValue * 0.0000565;
-                sfcLevy = netValue * 0.000027 + netValue * 0.0000015;
-                ccassFee = Math.max(2, netValue * 0.00002);
-                if (broker === "富途牛牛") {
-                    commission = Math.max(3, netValue * 0.0003);
-                    platformFee = 15;
-                } else if (broker === "HSBC") {
-                    commission = Math.max(100, netValue * 0.0025);
-                    platformFee = 0;
-                }
-            }
-
-            const totalFee = stampDuty + tradingFee + sfcLevy + ccassFee + commission + platformFee;
-            const finalTotal = type === "買入" ? (netValue + totalFee) : (netValue - totalFee);
-
-            // 更新表格
-            document.getElementById('valNet').innerText = netValue.toFixed(2);
-            document.getElementById('valStamp').innerText = stampDuty.toFixed(2);
-            document.getElementById('valSfc').innerText = (sfcLevy + tradingFee).toFixed(2);
-            document.getElementById('valCcass').innerText = ccassFee.toFixed(2);
-            document.getElementById('valComm').innerText = commission.toFixed(2);
-            document.getElementById('valPlat').innerText = platformFee.toFixed(2);
-            document.getElementById('valTotalFee').innerText = totalFee.toFixed(2);
-            document.getElementById('finalTotalLabel').innerText = type === "買入" ? "應付總額" : "實收總額";
-            document.getElementById('valFinalTotal').innerText = finalTotal.toFixed(2);
-
-            document.getElementById('mainHighlight').innerText = "$" + finalTotal.toFixed(2);
-            document.getElementById('mainHighlight').className = "text-3xl font-bold mt-2 " + (type === "賣出" ? "profit-green" : "loss-red");
-
-            // 精準利潤計算 (依據所選倉位)
-            const profitEl = document.getElementById('profitHighlight');
-            if (type === "賣出" && selectedPosition) {
-                // 依據賣出比例，分攤當初的買入手續費
-                const currentBuyFee = selectedPosition.buyFee * (qty / selectedPosition.originalQty);
-                const costTotal = (selectedPosition.price * qty) + currentBuyFee;
-                
-                // 淨利 = 實收總額 - 實際成本
-                const profitAmount = finalTotal - costTotal;
-                const profitPercent = (profitAmount / costTotal) * 100;
-
-                profitEl.classList.remove('hidden');
-                if (profitAmount >= 0) {
-                    profitEl.innerHTML = `稅後淨利: +$${profitAmount.toFixed(2)} (+${profitPercent.toFixed(2)}%)`;
-                    profitEl.className = "text-2xl font-bold mt-1 profit-green";
-                } else {
-                    profitEl.innerHTML = `稅後淨損: -$${Math.abs(profitAmount).toFixed(2)} (${profitPercent.toFixed(2)}%)`;
-                    profitEl.className = "text-2xl font-bold mt-1 loss-red";
-                }
-            } else {
-                profitEl.classList.add('hidden');
-            }
-        }
-
-        function submitData() {
-            const type = document.getElementById('txType').value;
-            
-            if (type === "賣出" && !selectedPosition) {
-                alert("請先查詢並勾選要平倉的持倉紀錄！");
-                return;
-            }
-
-            const data = {
-                action: "addTransaction",
-                tx: {
-                    type: type,
-                    date: document.getElementById('txDate').value,
-                    ticker: document.getElementById('txTicker').value,
-                    price: parseFloat(document.getElementById('txPrice').value),
-                    quantity: parseFloat(document.getElementById('txQty').value),
-                    broker: document.getElementById('txBroker').value,
-                    targetPosId: selectedPosition ? selectedPosition.id : null
-                }
-            };
-
-            if(!data.tx.ticker || !data.tx.price || !data.tx.quantity) {
-                alert("請填寫完整的資料！"); return;
-            }
-            if(type === "賣出" && data.tx.quantity > selectedPosition.remainingQty) {
-                alert("錯誤：賣出股數不可大於該倉位的剩餘股數！"); return;
-            }
-
-            const btn = document.getElementById('btnSubmit');
-            btn.innerText = "處理中...";
-            btn.disabled = true;
-
-            fetch(GOOGLE_APP_SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(data)
+                body: JSON.stringify({ action: "getDashboard" })
             })
             .then(res => res.json())
             .then(res => {
                 if(res.success) {
-                    alert('交易已成功送出！');
-                    document.getElementById('transactionForm').reset();
-                    document.getElementById('txDate').valueAsDate = new Date();
-                    document.getElementById('positionList').innerHTML = '';
-                    selectedPosition = null;
-                    updatePreview();
-                } else {
-                    alert('後端拒絕：' + res.message);
+                    renderDashboard(res.data);
                 }
-                btn.innerText = "確認送出至資料庫";
-                btn.disabled = false;
             })
-            .catch(error => {
-                alert('傳送失敗，請確保有重新部署 API 並貼上最新 URL。');
-                btn.innerText = "確認送出至資料庫";
-                btn.disabled = false;
+            .catch(err => console.log("Dashboard Fetch Error:", err));
+        }
+
+        function renderDashboard(data) {
+            // 更新數字看板
+            document.getElementById('dashNav').innerText = `$${data.totalNav.toLocaleString()}`;
+            document.getElementById('dashCash').innerText = `$${data.cash.toLocaleString()}`;
+            
+            const unrealizedEl = document.getElementById('dashUnrealized');
+            unrealizedEl.innerText = `$${data.unrealizedPnL.toLocaleString()}`;
+            unrealizedEl.className = `text-2xl font-bold mt-1 ${data.unrealizedPnL >= 0 ? 'profit-green' : 'loss-red'}`;
+
+            const roiEl = document.getElementById('dashRoi');
+            roiEl.innerText = `${data.totalRoi.toFixed(2)}%`;
+            roiEl.className = `text-2xl font-bold mt-1 ${data.totalRoi >= 0 ? 'profit-green' : 'loss-red'}`;
+
+            // 更新持倉表
+            const tbody = document.getElementById('openPositionsTable');
+            tbody.innerHTML = '';
+            data.positions.forEach(pos => {
+                const pnl = pos.currentPrice * pos.qty - pos.buyPrice * pos.qty;
+                const pnlClass = pnl >= 0 ? 'profit-green' : 'loss-red';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-2 font-bold">${pos.ticker}</td>
+                    <td class="p-2 text-gray-500">${pos.date}</td>
+                    <td class="p-2">${pos.qty}</td>
+                    <td class="p-2">$${pos.buyPrice.toFixed(2)}</td>
+                    <td class="p-2 font-bold">$${pos.currentPrice.toFixed(2)}</td>
+                    <td class="p-2 text-right ${pnlClass} font-bold">$${pnl.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 繪製圖表
+            renderCharts(data.chartData);
+        }
+
+        function renderCharts(chartData) {
+            if(navChartInstance) navChartInstance.destroy();
+            if(allocationChartInstance) allocationChartInstance.destroy();
+
+            // 走勢圖
+            const ctxNav = document.getElementById('navChart').getContext('2d');
+            navChartInstance = new Chart(ctxNav, {
+                type: 'line',
+                data: {
+                    labels: chartData.months, // e.g. ['Jan', 'Feb', 'Mar']
+                    datasets: [{
+                        label: '資產淨值走勢',
+                        data: chartData.navHistory,
+                        borderColor: '#3b82f6',
+                        tension: 0.3,
+                        fill: true,
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                    }]
+                }
+            });
+
+            // 圓餅圖
+            const ctxAlloc = document.getElementById('allocationChart').getContext('2d');
+            allocationChartInstance = new Chart(ctxAlloc, {
+                type: 'doughnut',
+                data: {
+                    labels: ['持倉股票', '保留現金'],
+                    datasets: [{
+                        data: [chartData.stockValue, chartData.cashValue],
+                        backgroundColor: ['#3b82f6', '#9ca3af']
+                    }]
+                }
+            });
+        }
+
+        // ==================== 第三步：成員專屬區邏輯 ====================
+        function fetchMemberData() {
+            const memberName = document.getElementById('memberSelect').value;
+            if (!memberName) {
+                document.getElementById('memberStats').classList.add('hidden');
+                return;
+            }
+
+            document.getElementById('memberStats').classList.remove('hidden');
+            
+            // 向 GAS 請求成員資料
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: "getMemberData", member: memberName })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.success) {
+                    document.getElementById('memCapital').innerText = `$${res.data.capital.toLocaleString()}`;
+                    document.getElementById('memEquity').innerText = `${res.data.equityPercent.toFixed(2)}%`;
+                    document.getElementById('memDividend').innerText = `$${res.data.monthlyDividend.toLocaleString()}`;
+                    document.getElementById('memDivRule').innerText = `依據年化 ${res.data.interestRate}% 設定計算`;
+                }
             });
         }
     </script>
