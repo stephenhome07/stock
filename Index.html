@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V2.0 小家族基金管理系統</title>
+    <title>V2.1 小家族基金管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -273,11 +273,214 @@
         // (原本的 fetchPositions, renderPositions, selectPos, updatePreview, submitData 保持不變，為節省版面精簡呈現，請確保保留您原先完整的 JS 邏輯)
         // ... 此處貼上您原本 Step 1 的所有 JavaScript 函數 ...
 
-        function fetchPositions() { /* ...維持原代碼... */ }
-        function renderPositions() { /* ...維持原代碼... */ }
-        function selectPos(index) { /* ...維持原代碼... */ }
-        function updatePreview() { /* ...維持原代碼... */ }
-        function submitData() { /* ...維持原代碼... */ }
+// ==================== 以下為補回的完整交易與預覽邏輯 ====================
+
+        // 抓取持倉資料
+        function fetchPositions() {
+            const ticker = document.getElementById('txTicker').value;
+            if (!ticker) { alert("請先輸入股票代號"); return; }
+            
+            const btn = document.getElementById('btnFetchPos');
+            btn.innerText = "查詢中...";
+            btn.disabled = true;
+
+            const payload = { action: "getOpenPositions", ticker: ticker };
+
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(res => {
+                btn.innerText = "查詢倉位";
+                btn.disabled = false;
+                if (res.success) {
+                    currentOpenPositions = res.data;
+                    renderPositions();
+                } else {
+                    alert("查詢失敗：" + res.error);
+                }
+            })
+            .catch(err => {
+                alert("網路錯誤或 API 網址有誤。");
+                btn.innerText = "查詢倉位";
+                btn.disabled = false;
+            });
+        }
+
+        // 渲染持倉卡片與到價提示
+        function renderPositions() {
+            const listDiv = document.getElementById('positionList');
+            listDiv.innerHTML = '';
+            selectedPosition = null;
+
+            if (currentOpenPositions.length === 0) {
+                listDiv.innerHTML = '<div class="text-sm text-red-500">找不到該股票的未平倉紀錄。</div>';
+                return;
+            }
+
+            currentOpenPositions.forEach((pos, index) => {
+                const buyP = parseFloat(pos.price);
+                const p10 = (buyP * 1.10).toFixed(3);
+                const p5  = (buyP * 1.05).toFixed(3);
+                const m5  = (buyP * 0.95).toFixed(3);
+                const m10 = (buyP * 0.90).toFixed(3);
+
+                const div = document.createElement('label');
+                div.className = "block p-3 border rounded-lg cursor-pointer hover:bg-blue-50 mb-2 bg-white";
+                div.innerHTML = `
+                    <div class="flex items-center justify-between border-b pb-2 mb-2">
+                        <div>
+                            <input type="radio" name="selectedPos" value="${index}" class="mr-2" onchange="selectPos(${index})">
+                            <span class="font-bold text-gray-800">買入價: $${buyP}</span> 
+                            <span class="text-sm text-gray-600">(剩餘: ${pos.remainingQty} 股)</span>
+                        </div>
+                        <div class="text-xs text-gray-500">${pos.date}</div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2 text-xs text-center font-bold">
+                        <div class="bg-red-100 text-red-700 py-1 rounded">止蝕 -10%<br>$${m10}</div>
+                        <div class="bg-orange-100 text-orange-700 py-1 rounded">止蝕 -5%<br>$${m5}</div>
+                        <div class="bg-green-100 text-green-700 py-1 rounded">止賺 +5%<br>$${p5}</div>
+                        <div class="bg-emerald-200 text-emerald-800 py-1 rounded">止賺 +10%<br>$${p10}</div>
+                    </div>
+                `;
+                listDiv.appendChild(div);
+            });
+        }
+
+        // 當用戶選擇某個倉位時觸發
+        function selectPos(index) {
+            selectedPosition = currentOpenPositions[index];
+            document.getElementById('txQty').value = selectedPosition.remainingQty;
+            updatePreview();
+        }
+
+        // 核心預覽計算 (完全同步後端算式)
+        function updatePreview() {
+            const type = document.getElementById('txType').value;
+            const price = parseFloat(document.getElementById('txPrice').value) || 0;
+            const qty = parseFloat(document.getElementById('txQty').value) || 0;
+            const broker = document.getElementById('txBroker').value;
+
+            if (price === 0 || qty === 0) return;
+
+            const netValue = price * qty;
+            
+            // 手續費計算
+            let stampDuty = 0, sfcLevy = 0, ccassFee = 0, commission = 0, platformFee = 0, tradingFee = 0;
+            if (broker !== "手動") {
+                stampDuty = Math.ceil(netValue * 0.001);
+                tradingFee = netValue * 0.0000565;
+                sfcLevy = netValue * 0.000027 + netValue * 0.0000015;
+                ccassFee = Math.max(2, netValue * 0.00002);
+                if (broker === "富途牛牛") {
+                    commission = Math.max(3, netValue * 0.0003);
+                    platformFee = 15;
+                } else if (broker === "HSBC") {
+                    commission = Math.max(100, netValue * 0.0025);
+                    platformFee = 0;
+                }
+            }
+
+            const totalFee = stampDuty + tradingFee + sfcLevy + ccassFee + commission + platformFee;
+            const finalTotal = type === "買入" ? (netValue + totalFee) : (netValue - totalFee);
+
+            // 更新表格
+            document.getElementById('valNet').innerText = netValue.toFixed(2);
+            document.getElementById('valStamp').innerText = stampDuty.toFixed(2);
+            document.getElementById('valSfc').innerText = (sfcLevy + tradingFee).toFixed(2);
+            document.getElementById('valCcass').innerText = ccassFee.toFixed(2);
+            document.getElementById('valComm').innerText = commission.toFixed(2);
+            document.getElementById('valPlat').innerText = platformFee.toFixed(2);
+            document.getElementById('valTotalFee').innerText = totalFee.toFixed(2);
+            document.getElementById('finalTotalLabel').innerText = type === "買入" ? "應付總額" : "實收總額";
+            document.getElementById('valFinalTotal').innerText = finalTotal.toFixed(2);
+
+            document.getElementById('mainHighlight').innerText = "$" + finalTotal.toFixed(2);
+            document.getElementById('mainHighlight').className = "text-3xl font-bold mt-2 " + (type === "賣出" ? "profit-green" : "loss-red");
+
+            // 精準利潤計算 (依據所選倉位)
+            const profitEl = document.getElementById('profitHighlight');
+            if (type === "賣出" && selectedPosition) {
+                // 依據賣出比例，分攤當初的買入手續費
+                const currentBuyFee = selectedPosition.buyFee * (qty / selectedPosition.originalQty);
+                const costTotal = (selectedPosition.price * qty) + currentBuyFee;
+                
+                // 淨利 = 實收總額 - 實際成本
+                const profitAmount = finalTotal - costTotal;
+                const profitPercent = (profitAmount / costTotal) * 100;
+
+                profitEl.classList.remove('hidden');
+                if (profitAmount >= 0) {
+                    profitEl.innerHTML = `稅後淨利: +$${profitAmount.toFixed(2)} (+${profitPercent.toFixed(2)}%)`;
+                    profitEl.className = "text-2xl font-bold mt-1 profit-green";
+                } else {
+                    profitEl.innerHTML = `稅後淨損: -$${Math.abs(profitAmount).toFixed(2)} (${profitPercent.toFixed(2)}%)`;
+                    profitEl.className = "text-2xl font-bold mt-1 loss-red";
+                }
+            } else {
+                profitEl.classList.add('hidden');
+            }
+        }
+
+        // 送出交易
+        function submitData() {
+            const type = document.getElementById('txType').value;
+            
+            if (type === "賣出" && !selectedPosition) {
+                alert("請先查詢並勾選要平倉的持倉紀錄！");
+                return;
+            }
+
+            const data = {
+                action: "addTransaction",
+                tx: {
+                    type: type,
+                    date: document.getElementById('txDate').value,
+                    ticker: document.getElementById('txTicker').value,
+                    price: parseFloat(document.getElementById('txPrice').value),
+                    quantity: parseFloat(document.getElementById('txQty').value),
+                    broker: document.getElementById('txBroker').value,
+                    targetPosId: selectedPosition ? selectedPosition.id : null
+                }
+            };
+
+            if(!data.tx.ticker || !data.tx.price || !data.tx.quantity) {
+                alert("請填寫完整的資料！"); return;
+            }
+            if(type === "賣出" && data.tx.quantity > selectedPosition.remainingQty) {
+                alert("錯誤：賣出股數不可大於該倉位的剩餘股數！"); return;
+            }
+
+            const btn = document.getElementById('btnSubmit');
+            btn.innerText = "處理中...";
+            btn.disabled = true;
+
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.success) {
+                    alert('交易已成功送出！');
+                    document.getElementById('transactionForm').reset();
+                    document.getElementById('txDate').valueAsDate = new Date();
+                    document.getElementById('positionList').innerHTML = '';
+                    selectedPosition = null;
+                    updatePreview();
+                } else {
+                    alert('後端拒絕：' + res.message);
+                }
+                btn.innerText = "確認送出至資料庫";
+                btn.disabled = false;
+            })
+            .catch(error => {
+                alert('傳送失敗，請確保有重新部署 API 並貼上最新 URL。');
+                btn.innerText = "確認送出至資料庫";
+                btn.disabled = false;
+            });
+        }
 
 
         // ==================== 第二步：看板資料抓取與圖表 ====================
