@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V2.2 小家族基金管理系統</title>
+    <title>V2.3 小家族基金管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -279,37 +279,44 @@
     </div>
 
     <script>
+        // 【重要】請將下方 URL 替換為您的 Apps Script 部署網址
         const GOOGLE_APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbysMf-bAyli08G9kqYNrMjEo9zLfP3rC5sHIDcPR6iDIaokJ9WQphWtbW1zB3bg0HG0/exec'; 
 
-        // ==================== 視圖切換邏輯 ====================
+        // ==================== 視圖切換與初始化 ====================
         function switchTab(tabName) {
-            // 隱藏所有 View
-            document.getElementById('view-trade').classList.add('hidden');
-            document.getElementById('view-dashboard').classList.add('hidden');
-            document.getElementById('view-member').classList.add('hidden');
-            
-            // 重置 Tab 樣式
-            ['trade', 'dashboard', 'member'].forEach(name => {
-                const el = document.getElementById('tab-' + name);
-                el.classList.remove('tab-active', 'border-blue-500', 'text-blue-500');
-                el.classList.add('border-transparent', 'text-gray-500');
+            ['trade', 'dashboard', 'member', 'settings'].forEach(name => {
+                const viewEl = document.getElementById('view-' + name);
+                const tabEl = document.getElementById('tab-' + name);
+                if (viewEl) viewEl.classList.add('hidden');
+                if (tabEl) {
+                    tabEl.classList.remove('tab-active', 'border-blue-500', 'text-blue-500');
+                    tabEl.classList.add('border-transparent', 'text-gray-500');
+                }
             });
 
-            // 啟動對應 View 與 Tab
-            document.getElementById('view-' + tabName).classList.remove('hidden');
+            const activeView = document.getElementById('view-' + tabName);
             const activeTab = document.getElementById('tab-' + tabName);
-            activeTab.classList.remove('border-transparent', 'text-gray-500');
-            activeTab.classList.add('tab-active', 'border-blue-500');
+            
+            if (activeView) activeView.classList.remove('hidden');
+            if (activeTab) {
+                activeTab.classList.remove('border-transparent', 'text-gray-500');
+                activeTab.classList.add('tab-active', 'border-blue-500');
+            }
 
-            // 觸發載入資料
+            // 根據切換的頁籤載入資料
             if(tabName === 'dashboard') fetchDashboardData();
-            if(tabName === 'member' && document.getElementById('memberSelect').value !== "") fetchMemberData();
+            if(tabName === 'member') loadMembersDropdown();
+            if(tabName === 'settings') loadSettings();
         }
 
-        // ==================== 第一步：保留原本的交易邏輯 ====================
+        // 初始化日期為今天
+        document.getElementById('txDate').valueAsDate = new Date();
+        document.getElementById('incDate').valueAsDate = new Date();
+
+
+        // ==================== 交易輸入邏輯 (維持原樣) ====================
         let currentOpenPositions = [];
         let selectedPosition = null;
-        document.getElementById('txDate').valueAsDate = new Date();
 
         const inputs = ['txType', 'txPrice', 'txQty', 'txBroker'];
         inputs.forEach(id => {
@@ -327,122 +334,77 @@
             updatePreview();
         });
 
-        // (原本的 fetchPositions, renderPositions, selectPos, updatePreview, submitData 保持不變，為節省版面精簡呈現，請確保保留您原先完整的 JS 邏輯)
-        // ... 此處貼上您原本 Step 1 的所有 JavaScript 函數 ...
-
-// ==================== 以下為補回的完整交易與預覽邏輯 ====================
-
-        // 抓取持倉資料
         function fetchPositions() {
             const ticker = document.getElementById('txTicker').value;
             if (!ticker) { alert("請先輸入股票代號"); return; }
-            
             const btn = document.getElementById('btnFetchPos');
-            btn.innerText = "查詢中...";
-            btn.disabled = true;
+            btn.innerText = "查詢中..."; btn.disabled = true;
 
-            const payload = { action: "getOpenPositions", ticker: ticker };
-
-            fetch(GOOGLE_APP_SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(res => {
-                btn.innerText = "查詢倉位";
-                btn.disabled = false;
-                if (res.success) {
-                    currentOpenPositions = res.data;
-                    renderPositions();
-                } else {
-                    alert("查詢失敗：" + res.error);
-                }
-            })
-            .catch(err => {
-                alert("網路錯誤或 API 網址有誤。");
-                btn.innerText = "查詢倉位";
-                btn.disabled = false;
-            });
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getOpenPositions", ticker: ticker }) })
+            .then(res => res.json()).then(res => {
+                btn.innerText = "查詢倉位"; btn.disabled = false;
+                if (res.success) { currentOpenPositions = res.data; renderPositions(); } 
+                else alert("查詢失敗：" + res.error);
+            }).catch(err => { alert("網路錯誤"); btn.innerText = "查詢倉位"; btn.disabled = false; });
         }
 
-        // 渲染持倉卡片與到價提示
         function renderPositions() {
             const listDiv = document.getElementById('positionList');
-            listDiv.innerHTML = '';
-            selectedPosition = null;
-
+            listDiv.innerHTML = ''; selectedPosition = null;
             if (currentOpenPositions.length === 0) {
-                listDiv.innerHTML = '<div class="text-sm text-red-500">找不到該股票的未平倉紀錄。</div>';
-                return;
+                listDiv.innerHTML = '<div class="text-sm text-red-500">找不到未平倉紀錄。</div>'; return;
             }
-
             currentOpenPositions.forEach((pos, index) => {
                 const buyP = parseFloat(pos.price);
-                const p10 = (buyP * 1.10).toFixed(3);
-                const p5  = (buyP * 1.05).toFixed(3);
-                const m5  = (buyP * 0.95).toFixed(3);
-                const m10 = (buyP * 0.90).toFixed(3);
-
+                const p10 = (buyP * 1.10).toFixed(3), p5 = (buyP * 1.05).toFixed(3);
+                const m5 = (buyP * 0.95).toFixed(3), m10 = (buyP * 0.90).toFixed(3);
                 const div = document.createElement('label');
                 div.className = "block p-3 border rounded-lg cursor-pointer hover:bg-blue-50 mb-2 bg-white";
                 div.innerHTML = `
                     <div class="flex items-center justify-between border-b pb-2 mb-2">
                         <div>
                             <input type="radio" name="selectedPos" value="${index}" class="mr-2" onchange="selectPos(${index})">
-                            <span class="font-bold text-gray-800">買入價: $${buyP}</span> 
-                            <span class="text-sm text-gray-600">(剩餘: ${pos.remainingQty} 股)</span>
+                            <span class="font-bold">買入價: $${buyP}</span> <span class="text-sm text-gray-600">(剩餘: ${pos.remainingQty})</span>
                         </div>
                         <div class="text-xs text-gray-500">${pos.date}</div>
                     </div>
                     <div class="grid grid-cols-4 gap-2 text-xs text-center font-bold">
-                        <div class="bg-red-100 text-red-700 py-1 rounded">止蝕 -10%<br>$${m10}</div>
-                        <div class="bg-orange-100 text-orange-700 py-1 rounded">止蝕 -5%<br>$${m5}</div>
-                        <div class="bg-green-100 text-green-700 py-1 rounded">止賺 +5%<br>$${p5}</div>
-                        <div class="bg-emerald-200 text-emerald-800 py-1 rounded">止賺 +10%<br>$${p10}</div>
-                    </div>
-                `;
+                        <div class="bg-red-100 text-red-700 py-1 rounded">-10%<br>$${m10}</div>
+                        <div class="bg-orange-100 text-orange-700 py-1 rounded">-5%<br>$${m5}</div>
+                        <div class="bg-green-100 text-green-700 py-1 rounded">+5%<br>$${p5}</div>
+                        <div class="bg-emerald-200 text-emerald-800 py-1 rounded">+10%<br>$${p10}</div>
+                    </div>`;
                 listDiv.appendChild(div);
             });
         }
 
-        // 當用戶選擇某個倉位時觸發
         function selectPos(index) {
             selectedPosition = currentOpenPositions[index];
             document.getElementById('txQty').value = selectedPosition.remainingQty;
             updatePreview();
         }
 
-        // 核心預覽計算 (完全同步後端算式)
         function updatePreview() {
             const type = document.getElementById('txType').value;
             const price = parseFloat(document.getElementById('txPrice').value) || 0;
             const qty = parseFloat(document.getElementById('txQty').value) || 0;
             const broker = document.getElementById('txBroker').value;
-
             if (price === 0 || qty === 0) return;
-
             const netValue = price * qty;
             
-            // 手續費計算
             let stampDuty = 0, sfcLevy = 0, ccassFee = 0, commission = 0, platformFee = 0, tradingFee = 0;
             if (broker !== "手動") {
                 stampDuty = Math.ceil(netValue * 0.001);
                 tradingFee = netValue * 0.0000565;
                 sfcLevy = netValue * 0.000027 + netValue * 0.0000015;
                 ccassFee = Math.max(2, netValue * 0.00002);
-                if (broker === "富途牛牛") {
-                    commission = Math.max(3, netValue * 0.0003);
-                    platformFee = 15;
-                } else if (broker === "HSBC") {
-                    commission = Math.max(100, netValue * 0.0025);
-                    platformFee = 0;
-                }
+                if (broker === "富途牛牛") { commission = Math.max(3, netValue * 0.0003); platformFee = 15; } 
+                else if (broker === "HSBC") { commission = Math.max(100, netValue * 0.0025); platformFee = 0; }
             }
 
             const totalFee = stampDuty + tradingFee + sfcLevy + ccassFee + commission + platformFee;
             const finalTotal = type === "買入" ? (netValue + totalFee) : (netValue - totalFee);
 
-            // 更新表格
             document.getElementById('valNet').innerText = netValue.toFixed(2);
             document.getElementById('valStamp').innerText = stampDuty.toFixed(2);
             document.getElementById('valSfc').innerText = (sfcLevy + tradingFee).toFixed(2);
@@ -452,21 +414,15 @@
             document.getElementById('valTotalFee').innerText = totalFee.toFixed(2);
             document.getElementById('finalTotalLabel').innerText = type === "買入" ? "應付總額" : "實收總額";
             document.getElementById('valFinalTotal').innerText = finalTotal.toFixed(2);
-
             document.getElementById('mainHighlight').innerText = "$" + finalTotal.toFixed(2);
             document.getElementById('mainHighlight').className = "text-3xl font-bold mt-2 " + (type === "賣出" ? "profit-green" : "loss-red");
 
-            // 精準利潤計算 (依據所選倉位)
             const profitEl = document.getElementById('profitHighlight');
             if (type === "賣出" && selectedPosition) {
-                // 依據賣出比例，分攤當初的買入手續費
                 const currentBuyFee = selectedPosition.buyFee * (qty / selectedPosition.originalQty);
                 const costTotal = (selectedPosition.price * qty) + currentBuyFee;
-                
-                // 淨利 = 實收總額 - 實際成本
                 const profitAmount = finalTotal - costTotal;
                 const profitPercent = (profitAmount / costTotal) * 100;
-
                 profitEl.classList.remove('hidden');
                 if (profitAmount >= 0) {
                     profitEl.innerHTML = `稅後淨利: +$${profitAmount.toFixed(2)} (+${profitPercent.toFixed(2)}%)`;
@@ -475,25 +431,17 @@
                     profitEl.innerHTML = `稅後淨損: -$${Math.abs(profitAmount).toFixed(2)} (${profitPercent.toFixed(2)}%)`;
                     profitEl.className = "text-2xl font-bold mt-1 loss-red";
                 }
-            } else {
-                profitEl.classList.add('hidden');
-            }
+            } else profitEl.classList.add('hidden');
         }
 
-        // 送出交易
         function submitData() {
             const type = document.getElementById('txType').value;
+            if (type === "賣出" && !selectedPosition) return alert("請勾選要平倉的紀錄！");
             
-            if (type === "賣出" && !selectedPosition) {
-                alert("請先查詢並勾選要平倉的持倉紀錄！");
-                return;
-            }
-
             const data = {
                 action: "addTransaction",
                 tx: {
-                    type: type,
-                    date: document.getElementById('txDate').value,
+                    type: type, date: document.getElementById('txDate').value,
                     ticker: document.getElementById('txTicker').value,
                     price: parseFloat(document.getElementById('txPrice').value),
                     quantity: parseFloat(document.getElementById('txQty').value),
@@ -501,96 +449,86 @@
                     targetPosId: selectedPosition ? selectedPosition.id : null
                 }
             };
+            if(!data.tx.ticker || !data.tx.price || !data.tx.quantity) return alert("請填寫完整！");
+            if(type === "賣出" && data.tx.quantity > selectedPosition.remainingQty) return alert("賣出大於剩餘！");
 
-            if(!data.tx.ticker || !data.tx.price || !data.tx.quantity) {
-                alert("請填寫完整的資料！"); return;
-            }
-            if(type === "賣出" && data.tx.quantity > selectedPosition.remainingQty) {
-                alert("錯誤：賣出股數不可大於該倉位的剩餘股數！"); return;
-            }
-
-            const btn = document.getElementById('btnSubmit');
-            btn.innerText = "處理中...";
-            btn.disabled = true;
-
-            fetch(GOOGLE_APP_SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(res => {
+            const btn = document.getElementById('btnSubmit'); btn.innerText = "處理中..."; btn.disabled = true;
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) })
+            .then(res => res.json()).then(res => {
                 if(res.success) {
-                    alert('交易已成功送出！');
-                    document.getElementById('transactionForm').reset();
+                    alert('交易成功！'); document.getElementById('transactionForm').reset();
                     document.getElementById('txDate').valueAsDate = new Date();
-                    document.getElementById('positionList').innerHTML = '';
-                    selectedPosition = null;
-                    updatePreview();
-                } else {
-                    alert('後端拒絕：' + res.message);
-                }
-                btn.innerText = "確認送出至資料庫";
-                btn.disabled = false;
-            })
-            .catch(error => {
-                alert('傳送失敗，請確保有重新部署 API 並貼上最新 URL。');
-                btn.innerText = "確認送出至資料庫";
-                btn.disabled = false;
-            });
+                    document.getElementById('positionList').innerHTML = ''; selectedPosition = null; updatePreview();
+                } else alert('拒絕：' + res.message);
+                btn.innerText = "確認送出至資料庫"; btn.disabled = false;
+            }).catch(err => { alert('傳送失敗'); btn.innerText = "確認送出"; btn.disabled = false; });
         }
 
 
-        // ==================== 第二步：看板資料抓取與圖表 ====================
-        let navChartInstance = null;
-        let allocationChartInstance = null;
+        // ==================== 其他收益提交邏輯 (修復沒反應問題) ====================
+        function submitIncome() {
+            const dateVal = document.getElementById('incDate').value;
+            const amountVal = parseFloat(document.getElementById('incAmount').value);
+            
+            if(!dateVal || !amountVal) { alert("請完整輸入日期與利潤金額！"); return; }
+
+            const data = {
+                action: "addOtherIncome",
+                log: {
+                    date: dateVal,
+                    source: document.getElementById('incSource').value,
+                    amount: amountVal
+                }
+            };
+            
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) })
+            .then(res => res.json()).then(res => {
+                if(res.success) {
+                    alert('✅ 收益記錄成功！');
+                    document.getElementById('incAmount').value = '';
+                } else alert('❌ 錯誤: ' + res.message);
+            }).catch(err => alert("網路傳送失敗"));
+        }
+
+
+        // ==================== 看板資料與圖表 (加入收益明細表) ====================
+        let navChartInstance = null; let allocationChartInstance = null;
 
         function fetchDashboardData() {
-            // 向 GAS 請求總體資料
-            fetch(GOOGLE_APP_SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: "getDashboard" })
-            })
-            .then(res => res.json())
-            .then(res => {
-                if(res.success) {
-                    renderDashboard(res.data);
-                }
-            })
-            .catch(err => console.log("Dashboard Fetch Error:", err));
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getDashboard" }) })
+            .then(res => res.json()).then(res => { if(res.success) renderDashboard(res.data); });
         }
 
         function renderDashboard(data) {
-            // 更新數字看板
             document.getElementById('dashNav').innerText = `$${data.totalNav.toLocaleString()}`;
             document.getElementById('dashCash').innerText = `$${data.cash.toLocaleString()}`;
-            
-            const unrealizedEl = document.getElementById('dashUnrealized');
-            unrealizedEl.innerText = `$${data.unrealizedPnL.toLocaleString()}`;
-            unrealizedEl.className = `text-2xl font-bold mt-1 ${data.unrealizedPnL >= 0 ? 'profit-green' : 'loss-red'}`;
+            document.getElementById('dashUnrealized').innerText = `$${data.unrealizedPnL.toLocaleString()}`;
+            document.getElementById('dashUnrealized').className = `text-2xl font-bold mt-1 ${data.unrealizedPnL >= 0 ? 'profit-green' : 'loss-red'}`;
+            document.getElementById('dashRoi').innerText = `${data.totalRoi.toFixed(2)}%`;
+            document.getElementById('dashRoi').className = `text-2xl font-bold mt-1 ${data.totalRoi >= 0 ? 'profit-green' : 'loss-red'}`;
 
-            const roiEl = document.getElementById('dashRoi');
-            roiEl.innerText = `${data.totalRoi.toFixed(2)}%`;
-            roiEl.className = `text-2xl font-bold mt-1 ${data.totalRoi >= 0 ? 'profit-green' : 'loss-red'}`;
+            // 持倉明細
+            const tbody = document.getElementById('openPositionsTable'); tbody.innerHTML = '';
+            if(data.positions.length > 0) {
+                data.positions.forEach(pos => {
+                    const pnl = pos.currentPrice * pos.qty - pos.buyPrice * pos.qty;
+                    tbody.innerHTML += `<tr><td class="p-2 font-bold">${pos.ticker}</td><td class="p-2 text-gray-500">${pos.date}</td>
+                    <td class="p-2">${pos.qty}</td><td class="p-2">$${pos.buyPrice.toFixed(2)}</td><td class="p-2 font-bold">$${pos.currentPrice.toFixed(2)}</td>
+                    <td class="p-2 text-right ${pnl >= 0 ? 'profit-green' : 'loss-red'} font-bold">$${pnl.toFixed(2)}</td></tr>`;
+                });
+            } else tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">無持倉</td></tr>';
 
-            // 更新持倉表
-            const tbody = document.getElementById('openPositionsTable');
-            tbody.innerHTML = '';
-            data.positions.forEach(pos => {
-                const pnl = pos.currentPrice * pos.qty - pos.buyPrice * pos.qty;
-                const pnlClass = pnl >= 0 ? 'profit-green' : 'loss-red';
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="p-2 font-bold">${pos.ticker}</td>
-                    <td class="p-2 text-gray-500">${pos.date}</td>
-                    <td class="p-2">${pos.qty}</td>
-                    <td class="p-2">$${pos.buyPrice.toFixed(2)}</td>
-                    <td class="p-2 font-bold">$${pos.currentPrice.toFixed(2)}</td>
-                    <td class="p-2 text-right ${pnlClass} font-bold">$${pnl.toFixed(2)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+            // 額外收益明細 (修復：找不到元素時不報錯)
+            const incTbody = document.getElementById('otherIncomeTable');
+            if (incTbody) {
+                incTbody.innerHTML = '';
+                if(data.otherIncomes && data.otherIncomes.length > 0) {
+                    data.otherIncomes.reverse().forEach(inc => {
+                        incTbody.innerHTML += `<tr><td class="p-2 text-gray-500">${inc.date}</td><td class="p-2">${inc.source}</td><td class="p-2 text-right profit-green font-bold">+$${inc.amount.toFixed(2)}</td></tr>`;
+                    });
+                } else incTbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">無紀錄</td></tr>';
+            }
 
-            // 繪製圖表
             renderCharts(data.chartData);
         }
 
@@ -598,60 +536,90 @@
             if(navChartInstance) navChartInstance.destroy();
             if(allocationChartInstance) allocationChartInstance.destroy();
 
-            // 走勢圖
-            const ctxNav = document.getElementById('navChart').getContext('2d');
-            navChartInstance = new Chart(ctxNav, {
-                type: 'line',
+            navChartInstance = new Chart(document.getElementById('navChart').getContext('2d'), {
+                type: 'bar',
                 data: {
-                    labels: chartData.months, // e.g. ['Jan', 'Feb', 'Mar']
-                    datasets: [{
-                        label: '資產淨值走勢',
-                        data: chartData.navHistory,
-                        borderColor: '#3b82f6',
-                        tension: 0.3,
-                        fill: true,
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)'
-                    }]
-                }
+                    labels: chartData.months,
+                    datasets: [
+                        { label: '當月年化報酬率 (%)', data: chartData.roiHistory, type: 'line', borderColor: '#f59e0b', backgroundColor: '#f59e0b', yAxisID: 'y1', tension: 0.3 },
+                        { label: '每月實現利潤 ($)', data: chartData.profitHistory, backgroundColor: chartData.profitHistory.map(v => v >= 0 ? 'rgba(34, 197, 94, 0.7)' : 'rgba(239, 68, 68, 0.7)'), yAxisID: 'y' }
+                    ]
+                },
+                options: { scales: { y: { type: 'linear', position: 'left' }, y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } } } }
             });
 
-            // 圓餅圖
-            const ctxAlloc = document.getElementById('allocationChart').getContext('2d');
-            allocationChartInstance = new Chart(ctxAlloc, {
+            allocationChartInstance = new Chart(document.getElementById('allocationChart').getContext('2d'), {
                 type: 'doughnut',
-                data: {
-                    labels: ['持倉股票', '保留現金'],
-                    datasets: [{
-                        data: [chartData.stockValue, chartData.cashValue],
-                        backgroundColor: ['#3b82f6', '#9ca3af']
-                    }]
-                }
+                data: { labels: ['持倉股票', '保留現金'], datasets: [{ data: [chartData.stockValue, chartData.cashValue], backgroundColor: ['#3b82f6', '#9ca3af'] }] }
             });
         }
 
-        // ==================== 第三步：成員專屬區邏輯 ====================
+
+        // ==================== 系統設定與成員專區邏輯 (修復新增成員沒反應) ====================
         function fetchMemberData() {
             const memberName = document.getElementById('memberSelect').value;
-            if (!memberName) {
-                document.getElementById('memberStats').classList.add('hidden');
-                return;
-            }
-
+            if (!memberName) { document.getElementById('memberStats').classList.add('hidden'); return; }
             document.getElementById('memberStats').classList.remove('hidden');
             
-            // 向 GAS 請求成員資料
-            fetch(GOOGLE_APP_SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: "getMemberData", member: memberName })
-            })
-            .then(res => res.json())
-            .then(res => {
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getMemberData", member: memberName }) })
+            .then(res => res.json()).then(res => {
                 if(res.success) {
                     document.getElementById('memCapital').innerText = `$${res.data.capital.toLocaleString()}`;
                     document.getElementById('memEquity').innerText = `${res.data.equityPercent.toFixed(2)}%`;
                     document.getElementById('memDividend').innerText = `$${res.data.monthlyDividend.toLocaleString()}`;
-                    document.getElementById('memDivRule').innerText = `依據年化 ${res.data.interestRate}% 設定計算`;
+                    document.getElementById('memDivRule').innerText = `依據年化 ${res.data.interestRate}% 計算`;
                 }
+            });
+        }
+
+        function loadSettings() {
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getSettings" }) })
+            .then(res => res.json()).then(res => {
+                const tbody = document.getElementById('settingsTableBody');
+                tbody.innerHTML = '';
+                if(res.data && res.data.length > 0) {
+                    res.data.forEach(m => addMemberRow(m.name, m.capital, m.rate));
+                } else addMemberRow(); // 若無資料預設給一行
+            });
+        }
+
+        // 這就是之前缺失的「新增成員行」函數
+        function addMemberRow(name = '', capital = 0, rate = 5) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="p-2"><input type="text" value="${name}" class="mem-name border p-1 w-full" placeholder="例如: 成員A"></td>
+                <td class="p-2"><input type="number" value="${capital}" class="mem-cap border p-1 w-full" placeholder="金額"></td>
+                <td class="p-2"><input type="number" value="${rate}" step="0.1" class="mem-rate border p-1 w-full" placeholder="5"></td>
+                <td class="p-2"><button onclick="this.parentElement.parentElement.remove()" class="text-red-500 font-bold hover:underline">刪除</button></td>
+            `;
+            document.getElementById('settingsTableBody').appendChild(tr);
+        }
+
+        function saveSettings() {
+            const rows = document.querySelectorAll('#settingsTableBody tr');
+            const members = [];
+            rows.forEach(tr => {
+                const name = tr.querySelector('.mem-name').value;
+                if(name) { // 略過未填寫名稱的空行
+                    members.push({
+                        name: name,
+                        capital: tr.querySelector('.mem-cap').value,
+                        rate: tr.querySelector('.mem-rate').value
+                    });
+                }
+            });
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "saveMemberSettings", members: members }) })
+            .then(res => res.json()).then(res => {
+                if(res.success) alert('✅ 成員設定已儲存');
+            });
+        }
+
+        function loadMembersDropdown() {
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getSettings" }) })
+            .then(res => res.json()).then(res => {
+                const sel = document.getElementById('memberSelect');
+                sel.innerHTML = '<option value="">請選擇成員...</option>';
+                res.data.forEach(m => { sel.innerHTML += `<option value="${m.name}">${m.name}</option>`; });
             });
         }
     </script>
