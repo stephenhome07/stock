@@ -171,7 +171,7 @@
                     if (history.length > 0) {
                         history.forEach(row => {
                             tbody.innerHTML += `<tr>
-                                <td class="p-2">${row.month}</td>
+                                <td class="p-2">${normalizeMonth(row.month) || row.month}</td>
                                 <td class="p-2 text-right">$${Number(row.suggested).toFixed(2)}</td>
                                 <td class="p-2 text-right font-bold profit-green">$${Number(row.actual).toFixed(2)}</td>
                                 <td class="p-2 text-right">${Number(row.rate).toFixed(2)}%</td>
@@ -195,6 +195,22 @@
             });
         }
 
+        function normalizeMonth(val) {
+            if (val == null || val === '') return '';
+            const s = String(val).trim();
+            // yyyy-MM
+            let m = s.match(/^(\d{4})-(\d{1,2})$/);
+            if (m) return m[1] + '-' + m[2].padStart(2, '0');
+            // yyyy-MM-dd or ISO
+            m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (m) return m[1] + '-' + m[2].padStart(2, '0');
+            const d = new Date(s);
+            if (!isNaN(d.getTime())) {
+                return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+            }
+            return s;
+        }
+
         function renderPayoutChart(history) {
             // 建立最近 12 個月的月份標籤（含沒有派息的月份 = 0）
             const now = new Date();
@@ -202,8 +218,9 @@
             const amounts = [];
             const map = {};
             (history || []).forEach(row => {
-                if (row.month) {
-                    map[row.month] = (map[row.month] || 0) + (parseFloat(row.actual) || 0);
+                const key = normalizeMonth(row.month);
+                if (key) {
+                    map[key] = (map[key] || 0) + (parseFloat(row.actual) || 0);
                 }
             });
 
