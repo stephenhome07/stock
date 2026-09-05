@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小家族基金 · 成員查詢</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .profit-green { color: #16a34a; }
         .loss-red { color: #dc2626; }
@@ -12,13 +13,13 @@
 </head>
 <body class="bg-gray-100 font-sans min-h-screen pb-12">
     <nav class="bg-indigo-800 text-white p-4 shadow-md">
-        <div class="max-w-lg mx-auto flex justify-between items-center">
+        <div class="max-w-2xl mx-auto flex justify-between items-center">
             <h1 class="text-lg font-bold">小家族基金 · 成員查詢</h1>
             <span class="text-xs text-indigo-200">只讀 · 僅可查看自己資料</span>
         </div>
     </nav>
 
-    <div class="max-w-lg mx-auto mt-8 px-4 space-y-6">
+    <div class="max-w-2xl mx-auto mt-8 px-4 space-y-6">
         <!-- 登入區 -->
         <div id="loginBox" class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-xl font-bold text-gray-800 mb-1">登入查看</h2>
@@ -63,8 +64,15 @@
                 <div class="bg-gradient-to-br from-amber-500 to-orange-600 p-6 rounded-lg shadow-md text-white">
                     <p class="text-amber-100 text-sm">現時總價值（退出時可參考）</p>
                     <h3 class="text-3xl font-bold mt-2" id="portalCurrentValue">$0.00</h3>
-                    <p class="text-xs text-amber-100 mt-2" id="portalValueRule">本金 + 已派利息 $0</p>
+                    <p class="text-xs text-amber-100 mt-2" id="portalValueRule">本金 + 已派利息 $0　·　年化 —%</p>
                 </div>
+            </div>
+
+            <!-- 近 12 個月派息圖表 -->
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <h3 class="text-lg font-bold mb-3">近 12 個月派息</h3>
+                <canvas id="payoutChart" height="180"></canvas>
+                <p class="text-xs text-gray-400 mt-2">顯示最近 12 個月實際收到的派息金額</p>
             </div>
 
             <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
@@ -91,7 +99,8 @@
         // 【重要】請與管理員頁使用同一個 Apps Script 部署網址
         const GOOGLE_APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbysMf-bAyli08G9kqYNrMjEo9zLfP3rC5sHIDcPR6iDIaokJ9WQphWtbW1zB3bg0HG0/exec';
 
-        // 載入成員名單（只顯示名稱，不含敏感設定）
+        let payoutChartInstance = null;
+
         function loadMembers() {
             fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getSettings" }) })
             .then(res => res.json()).then(res => {
@@ -120,19 +129,47 @@
             })
             .then(res => res.json()).then(res => {
                 if (res.success) {
+                    const d = res.data;
+                    const history = d.payoutHistory || [];
+
+                    // 前端自行加總「已派利息」，避免後端未更新時顯示 $0
+                    let totalPaidFromHistory = 0;
+                    history.forEach(row => {
+                        totalPaidFromHistory += parseFloat(row.actual) || 0;
+                    });
+                    totalPaidFromHistory = Math.round(totalPaidFromHistory * 100) / 100;
+
+                    // 優先用後端 currentValue / totalPaid；若缺失或為 0 但有本金，則用本金 + 歷史加總
+                    const capital = Number(d.capital) || 0;
+                    let totalPaid = (d.totalPaid != null && !isNaN(Number(d.totalPaid)))
+                        ? Number(d.totalPaid)
+                        : totalPaidFromHistory;
+                    // 若後端 totalPaid 為 0 但歷史有紀錄，改用歷史加總
+                    if (totalPaid === 0 && totalPaidFromHistory > 0) {
+                        totalPaid = totalPaidFromHistory;
+                    }
+                    let currentValue = (d.currentValue != null && Number(d.currentValue) > 0)
+                        ? Number(d.currentValue)
+                        : Math.round((capital + totalPaid) * 100) / 100;
+                    // 再保險：至少應等於本金
+                    if (currentValue < capital) {
+                        currentValue = Math.round((capital + totalPaid) * 100) / 100;
+                    }
+
                     document.getElementById('loginBox').classList.add('hidden');
                     document.getElementById('portalContent').classList.remove('hidden');
-                    document.getElementById('portalName').innerText = res.data.name;
-                    document.getElementById('portalCapital').innerText = `$${Number(res.data.capital).toLocaleString()}`;
-                    document.getElementById('portalEquity').innerText = `${Number(res.data.equityPercent).toFixed(2)}%`;
-                    document.getElementById('portalCurrentValue').innerText = `$${Number(res.data.currentValue || 0).toLocaleString()}`;
+                    document.getElementById('portalName').innerText = d.name;
+                    document.getElementById('portalCapital').innerText = `$${capital.toLocaleString()}`;
+                    document.getElementById('portalEquity').innerText = `${Number(d.equityPercent || 0).toFixed(2)}%`;
+                    document.getElementById('portalCurrentValue').innerText = `$${currentValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
                     document.getElementById('portalValueRule').innerText =
-                        `本金 + 已派利息 $${Number(res.data.totalPaid || 0).toLocaleString()}　·　年化 ${res.data.interestRate}%`;
+                        `本金 + 已派利息 $${totalPaid.toLocaleString()}　·　年化 ${d.interestRate || 0}%`;
 
+                    // 派息表格
                     const tbody = document.getElementById('portalPayoutTable');
                     tbody.innerHTML = '';
-                    if (res.data.payoutHistory && res.data.payoutHistory.length > 0) {
-                        res.data.payoutHistory.forEach(row => {
+                    if (history.length > 0) {
+                        history.forEach(row => {
                             tbody.innerHTML += `<tr>
                                 <td class="p-2">${row.month}</td>
                                 <td class="p-2 text-right">$${Number(row.suggested).toFixed(2)}</td>
@@ -144,6 +181,9 @@
                     } else {
                         tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">暫無派息紀錄</td></tr>';
                     }
+
+                    // 近 12 個月圖表
+                    renderPayoutChart(history);
                 } else {
                     err.innerText = res.message || '登入失敗';
                     err.classList.remove('hidden');
@@ -155,14 +195,83 @@
             });
         }
 
+        function renderPayoutChart(history) {
+            // 建立最近 12 個月的月份標籤（含沒有派息的月份 = 0）
+            const now = new Date();
+            const months = [];
+            const amounts = [];
+            const map = {};
+            (history || []).forEach(row => {
+                if (row.month) {
+                    map[row.month] = (map[row.month] || 0) + (parseFloat(row.actual) || 0);
+                }
+            });
+
+            for (let i = 11; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                months.push(key);
+                amounts.push(Math.round((map[key] || 0) * 100) / 100);
+            }
+
+            if (payoutChartInstance) {
+                payoutChartInstance.destroy();
+            }
+            const ctx = document.getElementById('payoutChart').getContext('2d');
+            payoutChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: '實際派息 ($)',
+                        data: amounts,
+                        backgroundColor: amounts.map(v => v > 0 ? 'rgba(16, 185, 129, 0.75)' : 'rgba(203, 213, 225, 0.6)'),
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    return '實際派息: $' + Number(ctx.raw).toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(v) { return '$' + v; }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 12
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         function logoutPortal() {
             document.getElementById('portalContent').classList.add('hidden');
             document.getElementById('loginBox').classList.remove('hidden');
             document.getElementById('portalPin').value = '';
             document.getElementById('portalError').classList.add('hidden');
+            if (payoutChartInstance) {
+                payoutChartInstance.destroy();
+                payoutChartInstance = null;
+            }
         }
 
-        // 支援 Enter 鍵登入
         document.getElementById('portalPin').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') loginPortal();
         });
