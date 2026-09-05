@@ -187,17 +187,17 @@
                 </div>
             </div>
 
-            <!-- 基金淨價值：所有成員退出後剩餘 -->
+            <!-- 基金淨價值：歸管理人（NAV − 非管理成員權益） -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-indigo-500">
-                    <p class="text-gray-500 text-sm">成員權益總額（本金+已派息）</p>
+                    <p class="text-gray-500 text-sm">非管理成員權益總額</p>
                     <h3 class="text-xl font-bold text-gray-800 mt-1" id="dashMemberClaims">$0.00</h3>
-                    <p class="text-xs text-gray-400 mt-1">若全員退出需返還的總額</p>
+                    <p class="text-xs text-gray-400 mt-1">本金+已派息（不含管理人）</p>
                 </div>
                 <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-amber-500">
-                    <p class="text-gray-500 text-sm">基金淨價值（退出後剩餘）</p>
+                    <p class="text-gray-500 text-sm">基金淨價值（歸管理人）</p>
                     <h3 class="text-xl font-bold mt-1" id="dashResidual">$0.00</h3>
-                    <p class="text-xs text-gray-400 mt-1">NAV − 成員權益總額</p>
+                    <p class="text-xs text-gray-400 mt-1">NAV − 非管理成員權益</p>
                 </div>
                 <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-slate-400">
                     <p class="text-gray-500 text-sm">總投入本金</p>
@@ -301,11 +301,11 @@
             <!-- 基金淨價值摘要（全員退出後剩餘） -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div class="bg-indigo-50 border border-indigo-200 p-4 rounded-lg">
-                    <p class="text-indigo-600 text-sm">成員權益總額</p>
+                    <p class="text-indigo-600 text-sm">非管理成員權益總額</p>
                     <h3 class="text-xl font-bold text-indigo-900" id="memAllClaims">$0.00</h3>
                 </div>
                 <div class="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-                    <p class="text-amber-700 text-sm">基金淨價值（全員退出後剩餘）</p>
+                    <p class="text-amber-700 text-sm">基金淨價值（歸管理人）</p>
                     <h3 class="text-xl font-bold" id="memResidual">$0.00</h3>
                 </div>
                 <div class="bg-slate-50 border border-slate-200 p-4 rounded-lg">
@@ -409,7 +409,7 @@
                     <h2 class="text-xl font-bold text-gray-800">成員資金與回報率設定</h2>
                     <button onclick="saveSettings()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">儲存所有設定</button>
                 </div>
-                <p class="text-sm text-gray-500 mb-3">「存取 PIN」用於「成員查詢入口」，讓每位成員只能查看自己的資料。留空則無需 PIN。</p>
+                <p class="text-sm text-gray-500 mb-3">「存取 PIN」用於成員查詢頁。勾選「管理人」後，該成員權益不會從基金淨價值中扣除（剩餘歸管理人）。建議月息以「現時總價值」計算。</p>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="bg-gray-50 text-gray-600">
@@ -418,6 +418,7 @@
                                 <th class="p-2">投入資金 ($)</th>
                                 <th class="p-2">建議年化回報率 (%)</th>
                                 <th class="p-2">存取 PIN</th>
+                                <th class="p-2 text-center">管理人</th>
                                 <th class="p-2">操作</th>
                             </tr>
                         </thead>
@@ -679,8 +680,8 @@
             document.getElementById('dashRoi').innerText = `${Number(data.totalRoi).toFixed(2)}%`;
             document.getElementById('dashRoi').className = `text-xl md:text-2xl font-bold mt-1 ${data.totalRoi >= 0 ? 'profit-green' : 'loss-red'}`;
 
-            // 基金淨價值相關
-            const claims = data.totalMemberClaims || 0;
+            // 基金淨價值相關（非管理成員權益）
+            const claims = (data.nonManagerClaims != null ? data.nonManagerClaims : data.totalMemberClaims) || 0;
             const residual = data.residualValue != null ? data.residualValue : 0;
             const totalCap = data.totalCapital || 0;
             document.getElementById('dashMemberClaims').innerText = `$${Number(claims).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -773,7 +774,7 @@
                     document.getElementById('memCapital').innerText = `$${Number(res.data.capital).toLocaleString()}`;
                     document.getElementById('memEquity').innerText = `${Number(res.data.equityPercent).toFixed(2)}%`;
                     document.getElementById('memDividend').innerText = `$${Number(res.data.monthlyDividend).toLocaleString()}`;
-                    document.getElementById('memDivRule').innerText = `依據年化 ${res.data.interestRate}% 計算（本金 × 利率 ÷ 12）`;
+                    document.getElementById('memDivRule').innerText = `依據年化 ${res.data.interestRate}% × 現時總價值 ÷ 12`;
                     document.getElementById('memCurrentValue').innerText = `$${Number(res.data.currentValue || 0).toLocaleString()}`;
                     document.getElementById('memPaidRule').innerText = `本金 + 已派利息 $${Number(res.data.totalPaid || 0).toLocaleString()}`;
                     document.getElementById('payoutSuggested').value = res.data.monthlyDividend;
@@ -841,18 +842,19 @@
                 const tbody = document.getElementById('settingsTableBody');
                 tbody.innerHTML = '';
                 if(res.data && res.data.length > 0) {
-                    res.data.forEach(m => addMemberRow(m.name, m.capital, m.rate, m.pin || ''));
+                    res.data.forEach(m => addMemberRow(m.name, m.capital, m.rate, m.pin || '', !!m.isManager));
                 } else addMemberRow();
             });
         }
 
-        function addMemberRow(name = '', capital = 0, rate = 5, pin = '') {
+        function addMemberRow(name = '', capital = 0, rate = 5, pin = '', isManager = false) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="p-2"><input type="text" value="${name}" class="mem-name border p-1 w-full" placeholder="例如: A"></td>
                 <td class="p-2"><input type="number" value="${capital}" class="mem-cap border p-1 w-full" placeholder="金額"></td>
                 <td class="p-2"><input type="number" value="${rate}" step="0.1" class="mem-rate border p-1 w-full" placeholder="5"></td>
                 <td class="p-2"><input type="text" value="${pin}" class="mem-pin border p-1 w-full" placeholder="例如 1234"></td>
+                <td class="p-2 text-center"><input type="checkbox" class="mem-mgr w-4 h-4" ${isManager ? 'checked' : ''}></td>
                 <td class="p-2"><button onclick="this.parentElement.parentElement.remove()" class="text-red-500 font-bold hover:underline">刪除</button></td>
             `;
             document.getElementById('settingsTableBody').appendChild(tr);
@@ -868,7 +870,8 @@
                         name: name,
                         capital: tr.querySelector('.mem-cap').value,
                         rate: tr.querySelector('.mem-rate').value,
-                        pin: tr.querySelector('.mem-pin').value
+                        pin: tr.querySelector('.mem-pin').value,
+                        isManager: tr.querySelector('.mem-mgr').checked
                     });
                 }
             });
@@ -891,7 +894,7 @@
                 if (!res.success || !res.data) return;
                 const d = res.data;
                 const residual = d.residualValue != null ? d.residualValue : 0;
-                document.getElementById('memAllClaims').innerText = `$${Number(d.totalMemberClaims || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+                document.getElementById('memAllClaims').innerText = `$${Number((d.nonManagerClaims != null ? d.nonManagerClaims : d.totalMemberClaims) || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 document.getElementById('memResidual').innerText = `$${Number(residual).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
                 document.getElementById('memResidual').className = `text-xl font-bold ${residual >= 0 ? 'profit-green' : 'loss-red'}`;
                 document.getElementById('memNav').innerText = `$${Number(d.totalNav || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -899,8 +902,9 @@
                 tbody.innerHTML = '';
                 if (d.membersSummary && d.membersSummary.length) {
                     d.membersSummary.forEach(m => {
+                        const badge = m.isManager ? ' <span class="text-xs bg-amber-100 text-amber-800 px-1 rounded">管理人</span>' : '';
                         tbody.innerHTML += `<tr>
-                            <td class="p-2 font-medium">${m.name}</td>
+                            <td class="p-2 font-medium">${m.name}${badge}</td>
                             <td class="p-2 text-right">$${Number(m.capital).toLocaleString()}</td>
                             <td class="p-2 text-right">$${Number(m.totalPaid).toFixed(2)}</td>
                             <td class="p-2 text-right font-bold text-amber-700">$${Number(m.currentValue).toLocaleString()}</td>
