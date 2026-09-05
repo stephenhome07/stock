@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V2.3 小家族基金管理系統</title>
+    <title>V2.4 小家族基金管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -15,25 +15,25 @@
 <body class="bg-gray-100 font-sans pb-12">
     <nav class="bg-gray-800 text-white p-4 shadow-md">
         <div class="max-w-5xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold">小家族基金系統 V2.0</h1>
+            <h1 class="text-xl font-bold">小家族基金系統 V2.4</h1>
+            <span class="text-xs text-gray-400" id="navHint">管理員模式</span>
         </div>
     </nav>
 
     <!-- 導覽頁籤 -->
     <div class="max-w-5xl mx-auto mt-6 bg-white rounded-t-lg shadow-sm border-b">
-        <div class="flex">
-            <button onclick="switchTab('trade')" id="tab-trade" class="px-6 py-3 font-semibold border-b-4 tab-active">新增交易</button>
-            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-6 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500">基金總看板</button>
-            <button onclick="switchTab('member')" id="tab-member" class="px-6 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500">成員專區</button>
-            <button onclick="switchTab('settings')" id="tab-settings" class="px-6 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500">系統設定</button>
-            
+        <div class="flex flex-wrap">
+            <button onclick="switchTab('trade')" id="tab-trade" class="px-4 py-3 font-semibold border-b-4 tab-active text-sm md:text-base">新增交易</button>
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500 text-sm md:text-base">基金總看板</button>
+            <button onclick="switchTab('member')" id="tab-member" class="px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500 text-sm md:text-base">成員專區 (管理)</button>
+            <button onclick="switchTab('portal')" id="tab-portal" class="px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500 text-sm md:text-base">成員查詢入口</button>
+            <button onclick="switchTab('settings')" id="tab-settings" class="px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500 text-sm md:text-base">系統設定</button>
         </div>
     </div>
 
     <div class="max-w-5xl mx-auto">
-        <!-- ==================== 第一步：交易區 (維持原樣，加入隱藏切換) ==================== -->
+        <!-- ==================== 交易區 ==================== -->
         <div id="view-trade" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- 左側：交易輸入表單 -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-lg font-bold mb-4 border-b pb-2">新增交易</h2>
                 <form id="transactionForm" class="space-y-4">
@@ -96,103 +96,152 @@
                 </form>
             </div>
 
-
-            <div class="bg-white p-6 rounded-lg shadow-md mt-6">
-                <h2 class="text-lg font-bold mb-4 border-b pb-2">新增其他收益 (如股息/利息)</h2>
-                <form id="incomeForm" class="space-y-4">
-                    <div class="flex space-x-4">
-                        <label class="flex-1 block">
-                            <span class="text-gray-700 text-sm">日期</span>
-                            <input type="date" id="incDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50">
-                        </label>
-                        <label class="flex-1 block">
-                            <span class="text-gray-700 text-sm">收益來源</span>
-                            <select id="incSource" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                                <option value="股息">股票派息 (Dividend)</option>
-                                <option value="活期利息">銀行活期利息</option>
-                                <option value="美股收益">美股/其他投資收益</option>
-                                <option value="其他">其他</option>
-                            </select>
-                        </label>
-                    </div>
-                    <div>
-                        <label class="block">
-                            <span class="text-gray-700 text-sm">利潤金額 ($)</span>
-                            <input type="number" id="incAmount" step="0.01" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
-                        </label>
-                    </div>
-                    <button type="button" onclick="submitIncome()" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-green-700 transition">
-                        記錄收益
-                    </button>
-                </form>
-            </div>
-
-            <!-- 右側：即時預覽面板 -->
-            <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-gray-800">
-                <div class="text-center mb-6">
-                    <p class="text-sm text-gray-500" id="previewTitle">預估交易總額與費用</p>
-                    <div id="mainHighlight" class="text-3xl font-bold mt-2 text-gray-800">$0.00</div>
-                    <div id="profitHighlight" class="text-xl font-bold mt-1 hidden"></div>
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2">新增其他收益 (如股息/利息)</h2>
+                    <form id="incomeForm" class="space-y-4">
+                        <div class="flex space-x-4">
+                            <label class="flex-1 block">
+                                <span class="text-gray-700 text-sm">日期</span>
+                                <input type="date" id="incDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50">
+                            </label>
+                            <label class="flex-1 block">
+                                <span class="text-gray-700 text-sm">收益來源</span>
+                                <select id="incSource" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                                    <option value="股息">股票派息 (Dividend)</option>
+                                    <option value="活期利息">銀行活期利息</option>
+                                    <option value="美股收益">美股/其他投資收益</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block">
+                                <span class="text-gray-700 text-sm">利潤金額 ($)</span>
+                                <input type="number" id="incAmount" step="0.01" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
+                            </label>
+                        </div>
+                        <button type="button" onclick="submitIncome()" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-green-700 transition">
+                            記錄收益
+                        </button>
+                    </form>
                 </div>
 
-                <table class="w-full text-sm text-right">
-                    <thead>
-                        <tr class="text-gray-500 border-b">
-                            <th class="text-left py-2 font-normal">費用項目</th>
-                            <th class="py-2 font-normal" id="feeColTitle">預估金額</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-gray-700">
-                        <tr><td class="text-left py-2">股票淨值</td><td id="valNet">0.00</td></tr>
-                        <tr><td class="text-left py-2">印花稅 (0.1%)</td><td id="valStamp">0.00</td></tr>
-                        <tr><td class="text-left py-2">證監/財匯局徵費</td><td id="valSfc">0.00</td></tr>
-                        <tr><td class="text-left py-2">結算費</td><td id="valCcass">0.00</td></tr>
-                        <tr><td class="text-left py-2">佣金</td><td id="valComm">0.00</td></tr>
-                        <tr><td class="text-left py-2">平台使用費</td><td id="valPlat">0.00</td></tr>
-                        <tr class="border-t font-bold text-gray-900">
-                            <td class="text-left py-3">總費用</td><td id="valTotalFee">0.00</td>
-                        </tr>
-                        <tr class="border-t font-bold text-lg">
-                            <td class="text-left py-3 text-gray-900" id="finalTotalLabel">實際總額</td>
-                            <td id="valFinalTotal" class="text-gray-900">0.00</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <!-- 右側：即時預覽面板 -->
+                <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-gray-800">
+                    <div class="text-center mb-6">
+                        <p class="text-sm text-gray-500" id="previewTitle">預估交易總額與費用</p>
+                        <div id="mainHighlight" class="text-3xl font-bold mt-2 text-gray-800">$0.00</div>
+                        <div id="profitHighlight" class="text-xl font-bold mt-1 hidden"></div>
+                    </div>
+
+                    <table class="w-full text-sm text-right">
+                        <thead>
+                            <tr class="text-gray-500 border-b">
+                                <th class="text-left py-2 font-normal">費用項目</th>
+                                <th class="py-2 font-normal" id="feeColTitle">預估金額</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-700">
+                            <tr><td class="text-left py-2">股票淨值</td><td id="valNet">0.00</td></tr>
+                            <tr><td class="text-left py-2">印花稅 (0.1%)</td><td id="valStamp">0.00</td></tr>
+                            <tr><td class="text-left py-2">證監/財匯局徵費</td><td id="valSfc">0.00</td></tr>
+                            <tr><td class="text-left py-2">結算費</td><td id="valCcass">0.00</td></tr>
+                            <tr><td class="text-left py-2">佣金</td><td id="valComm">0.00</td></tr>
+                            <tr><td class="text-left py-2">平台使用費</td><td id="valPlat">0.00</td></tr>
+                            <tr class="border-t font-bold text-gray-900">
+                                <td class="text-left py-3">總費用</td><td id="valTotalFee">0.00</td>
+                            </tr>
+                            <tr class="border-t font-bold text-lg">
+                                <td class="text-left py-3 text-gray-900" id="finalTotalLabel">實際總額</td>
+                                <td id="valFinalTotal" class="text-gray-900">0.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- ==================== 第二步：基金總體看板 ==================== -->
+        <!-- ==================== 基金總體看板 ==================== -->
         <div id="view-dashboard" class="mt-4 hidden space-y-6">
-            <!-- 核心指標 -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <!-- 核心指標：5 格（加入當月已實現利潤） -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
                     <p class="text-gray-500 text-sm">總資產淨值 (NAV)</p>
-                    <h3 class="text-2xl font-bold text-gray-800 mt-1" id="dashNav">$0.00</h3>
+                    <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="dashNav">$0.00</h3>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-emerald-500">
+                    <p class="text-gray-500 text-sm">已實現利潤 (當月)</p>
+                    <h3 class="text-xl md:text-2xl font-bold mt-1" id="dashMonthRealized">$0.00</h3>
                 </div>
                 <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
                     <p class="text-gray-500 text-sm">未實現損益</p>
-                    <h3 class="text-2xl font-bold mt-1" id="dashUnrealized">$0.00</h3>
+                    <h3 class="text-xl md:text-2xl font-bold mt-1" id="dashUnrealized">$0.00</h3>
                 </div>
                 <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-purple-500">
                     <p class="text-gray-500 text-sm">總報酬率</p>
-                    <h3 class="text-2xl font-bold mt-1" id="dashRoi">0.00%</h3>
+                    <h3 class="text-xl md:text-2xl font-bold mt-1" id="dashRoi">0.00%</h3>
                 </div>
                 <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
                     <p class="text-gray-500 text-sm">保留現金</p>
-                    <h3 class="text-2xl font-bold text-gray-800 mt-1" id="dashCash">$0.00</h3>
+                    <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="dashCash">$0.00</h3>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- 圖表區 -->
                 <div class="bg-white p-4 rounded-lg shadow-md col-span-2">
                     <h2 class="text-lg font-bold mb-4">每月實現利潤與年化報酬率</h2>
                     <canvas id="navChart" height="100"></canvas>
                 </div>
-                <!-- 簡易分配區 -->
                 <div class="bg-white p-4 rounded-lg shadow-md">
                     <h2 class="text-lg font-bold mb-4">資產分佈</h2>
                     <canvas id="allocationChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- 已實現利潤明細（放在持倉上方） -->
+            <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <h2 class="text-lg font-bold">已實現利潤明細</h2>
+                    <div class="flex gap-2 text-sm">
+                        <button onclick="showRealizedView('summary')" id="btnRealizedSummary" class="bg-blue-100 text-blue-700 px-3 py-1 rounded">按月摘要</button>
+                        <button onclick="showRealizedView('detail')" id="btnRealizedDetail" class="bg-gray-100 text-gray-600 px-3 py-1 rounded">逐筆明細</button>
+                    </div>
+                </div>
+
+                <!-- 按月摘要表 -->
+                <div id="realizedSummaryView">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="p-2 rounded-tl-lg">月份</th>
+                                <th class="p-2 text-right">當月已實現利潤 ($)</th>
+                                <th class="p-2 text-right rounded-tr-lg">年化報酬率 (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="realizedSummaryTable" class="divide-y">
+                            <tr><td colspan="3" class="p-4 text-center text-gray-500">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="text-xs text-gray-400 mt-2">年化報酬率 = (當月利潤 ÷ 總投入本金) × 12 × 100%</p>
+                </div>
+
+                <!-- 逐筆明細表 -->
+                <div id="realizedDetailView" class="hidden">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="p-2 rounded-tl-lg">日期</th>
+                                <th class="p-2">類型</th>
+                                <th class="p-2">來源</th>
+                                <th class="p-2 text-right rounded-tr-lg">金額 ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="realizedDetailTable" class="divide-y">
+                            <tr><td colspan="4" class="p-4 text-center text-gray-500">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="text-xs text-gray-400 mt-2">來源包括：賣出平倉實現損益 + 新增其他收益（股息／利息等）</p>
                 </div>
             </div>
 
@@ -209,7 +258,7 @@
                             <th class="p-2">買入日期</th>
                             <th class="p-2">持股數</th>
                             <th class="p-2">買入均價</th>
-                            <th class="p-2">現價 (Google Finance)</th>
+                            <th class="p-2">現價</th>
                             <th class="p-2 text-right rounded-tr-lg">未實現損益</th>
                         </tr>
                     </thead>
@@ -220,44 +269,158 @@
             </div>
         </div>
 
-        <!-- ==================== 第三步：成員專屬區 ==================== -->
+        <!-- ==================== 成員專區 (管理員：計算建議派息 + 輸入實際派息) ==================== -->
         <div id="view-member" class="mt-4 hidden space-y-6">
-            <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-center">
+            <div class="bg-white p-6 rounded-lg shadow-md flex flex-wrap justify-between items-center gap-4">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800">切換成員</h2>
-                    <p class="text-sm text-gray-500 mt-1">查看個別成員的權益與配息</p>
+                    <h2 class="text-xl font-bold text-gray-800">成員專區（管理員）</h2>
+                    <p class="text-sm text-gray-500 mt-1">查看建議派息、輸入實際派息金額</p>
                 </div>
                 <select id="memberSelect" onchange="fetchMemberData()" class="block w-64 rounded-md border-gray-300 shadow-sm border p-2 text-lg focus:ring-blue-500">
                     <option value="">請選擇成員...</option>
-                    <option value="成員A">爸爸 (成員 A)</option>
-                    <option value="成員B">媽媽 (成員 B)</option>
-                    <option value="成員C">自己 (成員 C)</option>
                 </select>
             </div>
 
-            <div id="memberStats" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-lg shadow-md text-white">
-                    <p class="text-blue-100 text-sm">累積投入本金</p>
-                    <h3 class="text-3xl font-bold mt-2" id="memCapital">$0.00</h3>
+            <div id="memberStats" class="hidden space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-lg shadow-md text-white">
+                        <p class="text-blue-100 text-sm">累積投入本金</p>
+                        <h3 class="text-3xl font-bold mt-2" id="memCapital">$0.00</h3>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-500 to-purple-700 p-6 rounded-lg shadow-md text-white">
+                        <p class="text-purple-100 text-sm">基金持股佔比 (權益 %)</p>
+                        <h3 class="text-3xl font-bold mt-2" id="memEquity">0.00%</h3>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-500 to-emerald-700 p-6 rounded-lg shadow-md text-white relative overflow-hidden">
+                        <p class="text-green-100 text-sm">本月建議派息金額</p>
+                        <h3 class="text-3xl font-bold mt-2" id="memDividend">$0.00</h3>
+                        <p class="text-xs text-green-200 mt-2" id="memDivRule">依據年化 5% 設定計算</p>
+                    </div>
                 </div>
-                <div class="bg-gradient-to-br from-purple-500 to-purple-700 p-6 rounded-lg shadow-md text-white">
-                    <p class="text-purple-100 text-sm">基金持股佔比 (權益 %)</p>
-                    <h3 class="text-3xl font-bold mt-2" id="memEquity">0.00%</h3>
+
+                <!-- 輸入實際派息 -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2">記錄本月實際派息</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <label class="block">
+                            <span class="text-gray-700 text-sm">派息月份</span>
+                            <input type="month" id="payoutMonth" class="mt-1 block w-full rounded-md border p-2">
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 text-sm">建議金額 (自動帶入)</span>
+                            <input type="number" id="payoutSuggested" step="0.01" readonly class="mt-1 block w-full rounded-md border p-2 bg-gray-50">
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 text-sm">實際派息金額 ($)</span>
+                            <input type="number" id="payoutActual" step="0.01" class="mt-1 block w-full rounded-md border p-2">
+                        </label>
+                        <button onclick="submitPayout()" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded hover:bg-emerald-700 h-[42px]">
+                            儲存派息
+                        </button>
+                    </div>
+                    <label class="block mt-3">
+                        <span class="text-gray-700 text-sm">備註（可選）</span>
+                        <input type="text" id="payoutMemo" class="mt-1 block w-full rounded-md border p-2" placeholder="例如：已轉帳至銀行戶口">
+                    </label>
                 </div>
-                <div class="bg-gradient-to-br from-green-500 to-emerald-700 p-6 rounded-lg shadow-md text-white relative overflow-hidden">
-                    <p class="text-green-100 text-sm">本月預估派發利息</p>
-                    <h3 class="text-3xl font-bold mt-2" id="memDividend">$0.00</h3>
-                    <p class="text-xs text-green-200 mt-2" id="memDivRule">依據年化 5% 設定計算</p>
+
+                <!-- 該成員每月派息紀錄 -->
+                <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
+                    <h3 class="text-lg font-bold mb-4">該成員每月派息紀錄</h3>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="p-2">月份</th>
+                                <th class="p-2 text-right">建議金額</th>
+                                <th class="p-2 text-right">實際派息</th>
+                                <th class="p-2 text-right">年化利率</th>
+                                <th class="p-2">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody id="memberPayoutTable" class="divide-y">
+                            <tr><td colspan="5" class="p-4 text-center text-gray-500">請先選擇成員</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
 
+        <!-- ==================== 成員查詢入口（私密：需 PIN） ==================== -->
+        <div id="view-portal" class="mt-4 hidden space-y-6">
+            <div class="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto">
+                <h2 class="text-xl font-bold text-gray-800 mb-2">成員專屬查詢</h2>
+                <p class="text-sm text-gray-500 mb-4">請選擇自己的名字並輸入 PIN，只能查看自己的資料。</p>
+                <div class="space-y-3">
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">成員名稱</span>
+                        <select id="portalMember" class="mt-1 block w-full rounded-md border p-2">
+                            <option value="">請選擇...</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">存取 PIN</span>
+                        <input type="password" id="portalPin" class="mt-1 block w-full rounded-md border p-2" placeholder="輸入你的 PIN">
+                    </label>
+                    <button onclick="loginPortal()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded hover:bg-indigo-700">
+                        登入查看
+                    </button>
+                    <p id="portalError" class="text-red-500 text-sm hidden"></p>
+                </div>
+            </div>
+
+            <div id="portalContent" class="hidden space-y-6">
+                <div class="bg-white p-4 rounded-lg shadow-md flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold" id="portalName">成員</h2>
+                        <p class="text-sm text-gray-500">個人資產與派息紀錄</p>
+                    </div>
+                    <button onclick="logoutPortal()" class="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">登出</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-lg shadow-md text-white">
+                        <p class="text-blue-100 text-sm">我的投入本金</p>
+                        <h3 class="text-3xl font-bold mt-2" id="portalCapital">$0.00</h3>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-500 to-purple-700 p-6 rounded-lg shadow-md text-white">
+                        <p class="text-purple-100 text-sm">權益佔比</p>
+                        <h3 class="text-3xl font-bold mt-2" id="portalEquity">0.00%</h3>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-500 to-emerald-700 p-6 rounded-lg shadow-md text-white">
+                        <p class="text-green-100 text-sm">本月建議派息</p>
+                        <h3 class="text-3xl font-bold mt-2" id="portalDividend">$0.00</h3>
+                        <p class="text-xs text-green-200 mt-2" id="portalRate">年化 —%</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
+                    <h3 class="text-lg font-bold mb-4">我的每月派息紀錄</h3>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr>
+                                <th class="p-2">月份</th>
+                                <th class="p-2 text-right">建議金額</th>
+                                <th class="p-2 text-right">實際收到</th>
+                                <th class="p-2 text-right">年化利率</th>
+                                <th class="p-2">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody id="portalPayoutTable" class="divide-y">
+                            <tr><td colspan="5" class="p-4 text-center text-gray-500">暫無紀錄</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 系統設定 ==================== -->
         <div id="view-settings" class="mt-4 hidden space-y-6">
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <div class="flex justify-between items-center mb-4 border-b pb-2">
                     <h2 class="text-xl font-bold text-gray-800">成員資金與回報率設定</h2>
                     <button onclick="saveSettings()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">儲存所有設定</button>
                 </div>
+                <p class="text-sm text-gray-500 mb-3">「存取 PIN」用於「成員查詢入口」，讓每位成員只能查看自己的資料。留空則無需 PIN。</p>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="bg-gray-50 text-gray-600">
@@ -265,17 +428,17 @@
                                 <th class="p-2">成員名稱</th>
                                 <th class="p-2">投入資金 ($)</th>
                                 <th class="p-2">建議年化回報率 (%)</th>
+                                <th class="p-2">存取 PIN</th>
                                 <th class="p-2">操作</th>
                             </tr>
                         </thead>
                         <tbody id="settingsTableBody" class="divide-y">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
                 <button onclick="addMemberRow()" class="mt-4 text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">+ 新增成員</button>
             </div>
         </div>
-
     </div>
 
     <script>
@@ -284,7 +447,7 @@
 
         // ==================== 視圖切換與初始化 ====================
         function switchTab(tabName) {
-            ['trade', 'dashboard', 'member', 'settings'].forEach(name => {
+            ['trade', 'dashboard', 'member', 'portal', 'settings'].forEach(name => {
                 const viewEl = document.getElementById('view-' + name);
                 const tabEl = document.getElementById('tab-' + name);
                 if (viewEl) viewEl.classList.add('hidden');
@@ -303,18 +466,19 @@
                 activeTab.classList.add('tab-active', 'border-blue-500');
             }
 
-            // 根據切換的頁籤載入資料
             if(tabName === 'dashboard') fetchDashboardData();
             if(tabName === 'member') loadMembersDropdown();
+            if(tabName === 'portal') loadPortalMembers();
             if(tabName === 'settings') loadSettings();
         }
 
-        // 初始化日期為今天
         document.getElementById('txDate').valueAsDate = new Date();
         document.getElementById('incDate').valueAsDate = new Date();
+        // 預設派息月份為當月
+        const now = new Date();
+        document.getElementById('payoutMonth').value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
 
-
-        // ==================== 交易輸入邏輯 (維持原樣) ====================
+        // ==================== 交易輸入邏輯 ====================
         let currentOpenPositions = [];
         let selectedPosition = null;
 
@@ -464,8 +628,7 @@
             }).catch(err => { alert('傳送失敗'); btn.innerText = "確認送出"; btn.disabled = false; });
         }
 
-
-        // ==================== 其他收益提交邏輯 (修復沒反應問題) ====================
+        // ==================== 其他收益 ====================
         function submitIncome() {
             const dateVal = document.getElementById('incDate').value;
             const amountVal = parseFloat(document.getElementById('incAmount').value);
@@ -490,43 +653,87 @@
             }).catch(err => alert("網路傳送失敗"));
         }
 
-
-        // ==================== 看板資料與圖表 (加入收益明細表) ====================
+        // ==================== 看板 ====================
         let navChartInstance = null; let allocationChartInstance = null;
+        let lastDashboardData = null;
 
         function fetchDashboardData() {
             fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getDashboard" }) })
-            .then(res => res.json()).then(res => { if(res.success) renderDashboard(res.data); });
+            .then(res => res.json()).then(res => { if(res.success) { lastDashboardData = res.data; renderDashboard(res.data); } });
+        }
+
+        function showRealizedView(mode) {
+            const sumBtn = document.getElementById('btnRealizedSummary');
+            const detBtn = document.getElementById('btnRealizedDetail');
+            if (mode === 'summary') {
+                document.getElementById('realizedSummaryView').classList.remove('hidden');
+                document.getElementById('realizedDetailView').classList.add('hidden');
+                sumBtn.className = 'bg-blue-100 text-blue-700 px-3 py-1 rounded';
+                detBtn.className = 'bg-gray-100 text-gray-600 px-3 py-1 rounded';
+            } else {
+                document.getElementById('realizedSummaryView').classList.add('hidden');
+                document.getElementById('realizedDetailView').classList.remove('hidden');
+                sumBtn.className = 'bg-gray-100 text-gray-600 px-3 py-1 rounded';
+                detBtn.className = 'bg-blue-100 text-blue-700 px-3 py-1 rounded';
+            }
         }
 
         function renderDashboard(data) {
-            document.getElementById('dashNav').innerText = `$${data.totalNav.toLocaleString()}`;
-            document.getElementById('dashCash').innerText = `$${data.cash.toLocaleString()}`;
-            document.getElementById('dashUnrealized').innerText = `$${data.unrealizedPnL.toLocaleString()}`;
-            document.getElementById('dashUnrealized').className = `text-2xl font-bold mt-1 ${data.unrealizedPnL >= 0 ? 'profit-green' : 'loss-red'}`;
-            document.getElementById('dashRoi').innerText = `${data.totalRoi.toFixed(2)}%`;
-            document.getElementById('dashRoi').className = `text-2xl font-bold mt-1 ${data.totalRoi >= 0 ? 'profit-green' : 'loss-red'}`;
+            document.getElementById('dashNav').innerText = `$${Number(data.totalNav).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+            document.getElementById('dashCash').innerText = `$${Number(data.cash).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+            
+            const monthR = data.currentMonthRealized || 0;
+            document.getElementById('dashMonthRealized').innerText = `$${Number(monthR).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+            document.getElementById('dashMonthRealized').className = `text-xl md:text-2xl font-bold mt-1 ${monthR >= 0 ? 'profit-green' : 'loss-red'}`;
+
+            document.getElementById('dashUnrealized').innerText = `$${Number(data.unrealizedPnL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+            document.getElementById('dashUnrealized').className = `text-xl md:text-2xl font-bold mt-1 ${data.unrealizedPnL >= 0 ? 'profit-green' : 'loss-red'}`;
+            document.getElementById('dashRoi').innerText = `${Number(data.totalRoi).toFixed(2)}%`;
+            document.getElementById('dashRoi').className = `text-xl md:text-2xl font-bold mt-1 ${data.totalRoi >= 0 ? 'profit-green' : 'loss-red'}`;
 
             // 持倉明細
             const tbody = document.getElementById('openPositionsTable'); tbody.innerHTML = '';
-            if(data.positions.length > 0) {
+            if(data.positions && data.positions.length > 0) {
                 data.positions.forEach(pos => {
                     const pnl = pos.currentPrice * pos.qty - pos.buyPrice * pos.qty;
                     tbody.innerHTML += `<tr><td class="p-2 font-bold">${pos.ticker}</td><td class="p-2 text-gray-500">${pos.date}</td>
-                    <td class="p-2">${pos.qty}</td><td class="p-2">$${pos.buyPrice.toFixed(2)}</td><td class="p-2 font-bold">$${pos.currentPrice.toFixed(2)}</td>
+                    <td class="p-2">${pos.qty}</td><td class="p-2">$${Number(pos.buyPrice).toFixed(2)}</td><td class="p-2 font-bold">$${Number(pos.currentPrice).toFixed(2)}</td>
                     <td class="p-2 text-right ${pnl >= 0 ? 'profit-green' : 'loss-red'} font-bold">$${pnl.toFixed(2)}</td></tr>`;
                 });
             } else tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">無持倉</td></tr>';
 
-            // 額外收益明細 (修復：找不到元素時不報錯)
-            const incTbody = document.getElementById('otherIncomeTable');
-            if (incTbody) {
-                incTbody.innerHTML = '';
-                if(data.otherIncomes && data.otherIncomes.length > 0) {
-                    data.otherIncomes.reverse().forEach(inc => {
-                        incTbody.innerHTML += `<tr><td class="p-2 text-gray-500">${inc.date}</td><td class="p-2">${inc.source}</td><td class="p-2 text-right profit-green font-bold">+$${inc.amount.toFixed(2)}</td></tr>`;
-                    });
-                } else incTbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">無紀錄</td></tr>';
+            // 已實現利潤 - 按月摘要
+            const sumTbody = document.getElementById('realizedSummaryTable');
+            sumTbody.innerHTML = '';
+            if (data.monthlySummary && data.monthlySummary.length > 0) {
+                data.monthlySummary.forEach(row => {
+                    const cls = row.profit >= 0 ? 'profit-green' : 'loss-red';
+                    sumTbody.innerHTML += `<tr>
+                        <td class="p-2 font-medium">${row.month}</td>
+                        <td class="p-2 text-right ${cls} font-bold">$${Number(row.profit).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                        <td class="p-2 text-right ${cls}">${Number(row.annualizedRate).toFixed(2)}%</td>
+                    </tr>`;
+                });
+            } else {
+                sumTbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">暫無已實現利潤</td></tr>';
+            }
+
+            // 已實現利潤 - 逐筆
+            const detTbody = document.getElementById('realizedDetailTable');
+            detTbody.innerHTML = '';
+            if (data.realizedDetails && data.realizedDetails.length > 0) {
+                data.realizedDetails.forEach(row => {
+                    const cls = row.amount >= 0 ? 'profit-green' : 'loss-red';
+                    const sign = row.amount >= 0 ? '+' : '';
+                    detTbody.innerHTML += `<tr>
+                        <td class="p-2 text-gray-500">${row.date}</td>
+                        <td class="p-2">${row.type}</td>
+                        <td class="p-2">${row.source}</td>
+                        <td class="p-2 text-right ${cls} font-bold">${sign}$${Number(row.amount).toFixed(2)}</td>
+                    </tr>`;
+                });
+            } else {
+                detTbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">暫無紀錄</td></tr>';
             }
 
             renderCharts(data.chartData);
@@ -554,8 +761,9 @@
             });
         }
 
+        // ==================== 成員專區（管理員） ====================
+        let currentMemberData = null;
 
-        // ==================== 系統設定與成員專區邏輯 (修復新增成員沒反應) ====================
         function fetchMemberData() {
             const memberName = document.getElementById('memberSelect').value;
             if (!memberName) { document.getElementById('memberStats').classList.add('hidden'); return; }
@@ -564,32 +772,148 @@
             fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getMemberData", member: memberName }) })
             .then(res => res.json()).then(res => {
                 if(res.success) {
-                    document.getElementById('memCapital').innerText = `$${res.data.capital.toLocaleString()}`;
-                    document.getElementById('memEquity').innerText = `${res.data.equityPercent.toFixed(2)}%`;
-                    document.getElementById('memDividend').innerText = `$${res.data.monthlyDividend.toLocaleString()}`;
-                    document.getElementById('memDivRule').innerText = `依據年化 ${res.data.interestRate}% 計算`;
+                    currentMemberData = res.data;
+                    document.getElementById('memCapital').innerText = `$${Number(res.data.capital).toLocaleString()}`;
+                    document.getElementById('memEquity').innerText = `${Number(res.data.equityPercent).toFixed(2)}%`;
+                    document.getElementById('memDividend').innerText = `$${Number(res.data.monthlyDividend).toLocaleString()}`;
+                    document.getElementById('memDivRule').innerText = `依據年化 ${res.data.interestRate}% 計算（本金 × 利率 ÷ 12）`;
+                    document.getElementById('payoutSuggested').value = res.data.monthlyDividend;
+                    document.getElementById('payoutActual').value = res.data.monthlyDividend;
+                }
+            });
+
+            // 載入該成員派息歷史
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getPayoutHistory", member: memberName }) })
+            .then(res => res.json()).then(res => {
+                const tbody = document.getElementById('memberPayoutTable');
+                tbody.innerHTML = '';
+                if (res.success && res.data && res.data.length > 0) {
+                    res.data.forEach(row => {
+                        tbody.innerHTML += `<tr>
+                            <td class="p-2">${row.month}</td>
+                            <td class="p-2 text-right">$${Number(row.suggested).toFixed(2)}</td>
+                            <td class="p-2 text-right font-bold profit-green">$${Number(row.actual).toFixed(2)}</td>
+                            <td class="p-2 text-right">${Number(row.rate).toFixed(2)}%</td>
+                            <td class="p-2 text-gray-500">${row.memo || ''}</td>
+                        </tr>`;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">暫無派息紀錄</td></tr>';
                 }
             });
         }
 
+        function submitPayout() {
+            const memberName = document.getElementById('memberSelect').value;
+            if (!memberName) return alert('請先選擇成員');
+            const month = document.getElementById('payoutMonth').value;
+            const suggested = parseFloat(document.getElementById('payoutSuggested').value) || 0;
+            const actual = parseFloat(document.getElementById('payoutActual').value);
+            if (!month || isNaN(actual)) return alert('請填寫月份與實際派息金額');
+
+            const rate = currentMemberData ? currentMemberData.interestRate : 0;
+            const data = {
+                action: "addPayoutLog",
+                log: {
+                    month: month,
+                    member: memberName,
+                    suggested: suggested,
+                    actual: actual,
+                    rate: rate,
+                    memo: document.getElementById('payoutMemo').value || ''
+                }
+            };
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) })
+            .then(res => res.json()).then(res => {
+                if (res.success) {
+                    alert('✅ 派息紀錄已儲存');
+                    document.getElementById('payoutMemo').value = '';
+                    fetchMemberData(); // 刷新表
+                } else alert('❌ ' + (res.message || res.error));
+            }).catch(() => alert('網路錯誤'));
+        }
+
+        // ==================== 成員查詢入口（私密） ====================
+        function loadPortalMembers() {
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getSettings" }) })
+            .then(res => res.json()).then(res => {
+                const sel = document.getElementById('portalMember');
+                sel.innerHTML = '<option value="">請選擇...</option>';
+                if (res.data) res.data.forEach(m => { sel.innerHTML += `<option value="${m.name}">${m.name}</option>`; });
+            });
+        }
+
+        function loginPortal() {
+            const member = document.getElementById('portalMember').value;
+            const pin = document.getElementById('portalPin').value;
+            if (!member) {
+                document.getElementById('portalError').innerText = '請選擇成員';
+                document.getElementById('portalError').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('portalError').classList.add('hidden');
+
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "verifyMemberAccess", member: member, pin: pin }) })
+            .then(res => res.json()).then(res => {
+                if (res.success) {
+                    document.getElementById('portalContent').classList.remove('hidden');
+                    document.getElementById('portalName').innerText = res.data.name;
+                    document.getElementById('portalCapital').innerText = `$${Number(res.data.capital).toLocaleString()}`;
+                    document.getElementById('portalEquity').innerText = `${Number(res.data.equityPercent).toFixed(2)}%`;
+                    document.getElementById('portalDividend').innerText = `$${Number(res.data.monthlyDividend).toLocaleString()}`;
+                    document.getElementById('portalRate').innerText = `年化 ${res.data.interestRate}%`;
+
+                    const tbody = document.getElementById('portalPayoutTable');
+                    tbody.innerHTML = '';
+                    if (res.data.payoutHistory && res.data.payoutHistory.length > 0) {
+                        res.data.payoutHistory.forEach(row => {
+                            tbody.innerHTML += `<tr>
+                                <td class="p-2">${row.month}</td>
+                                <td class="p-2 text-right">$${Number(row.suggested).toFixed(2)}</td>
+                                <td class="p-2 text-right font-bold profit-green">$${Number(row.actual).toFixed(2)}</td>
+                                <td class="p-2 text-right">${Number(row.rate).toFixed(2)}%</td>
+                                <td class="p-2 text-gray-500">${row.memo || ''}</td>
+                            </tr>`;
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">暫無派息紀錄</td></tr>';
+                    }
+                } else {
+                    document.getElementById('portalError').innerText = res.message || '登入失敗';
+                    document.getElementById('portalError').classList.remove('hidden');
+                    document.getElementById('portalContent').classList.add('hidden');
+                }
+            }).catch(() => {
+                document.getElementById('portalError').innerText = '網路錯誤';
+                document.getElementById('portalError').classList.remove('hidden');
+            });
+        }
+
+        function logoutPortal() {
+            document.getElementById('portalContent').classList.add('hidden');
+            document.getElementById('portalPin').value = '';
+            document.getElementById('portalError').classList.add('hidden');
+        }
+
+        // ==================== 系統設定 ====================
         function loadSettings() {
             fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getSettings" }) })
             .then(res => res.json()).then(res => {
                 const tbody = document.getElementById('settingsTableBody');
                 tbody.innerHTML = '';
                 if(res.data && res.data.length > 0) {
-                    res.data.forEach(m => addMemberRow(m.name, m.capital, m.rate));
-                } else addMemberRow(); // 若無資料預設給一行
+                    res.data.forEach(m => addMemberRow(m.name, m.capital, m.rate, m.pin || ''));
+                } else addMemberRow();
             });
         }
 
-        // 這就是之前缺失的「新增成員行」函數
-        function addMemberRow(name = '', capital = 0, rate = 5) {
+        function addMemberRow(name = '', capital = 0, rate = 5, pin = '') {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="p-2"><input type="text" value="${name}" class="mem-name border p-1 w-full" placeholder="例如: 成員A"></td>
+                <td class="p-2"><input type="text" value="${name}" class="mem-name border p-1 w-full" placeholder="例如: A"></td>
                 <td class="p-2"><input type="number" value="${capital}" class="mem-cap border p-1 w-full" placeholder="金額"></td>
                 <td class="p-2"><input type="number" value="${rate}" step="0.1" class="mem-rate border p-1 w-full" placeholder="5"></td>
+                <td class="p-2"><input type="text" value="${pin}" class="mem-pin border p-1 w-full" placeholder="例如 1234"></td>
                 <td class="p-2"><button onclick="this.parentElement.parentElement.remove()" class="text-red-500 font-bold hover:underline">刪除</button></td>
             `;
             document.getElementById('settingsTableBody').appendChild(tr);
@@ -600,11 +924,12 @@
             const members = [];
             rows.forEach(tr => {
                 const name = tr.querySelector('.mem-name').value;
-                if(name) { // 略過未填寫名稱的空行
+                if(name) {
                     members.push({
                         name: name,
                         capital: tr.querySelector('.mem-cap').value,
-                        rate: tr.querySelector('.mem-rate').value
+                        rate: tr.querySelector('.mem-rate').value,
+                        pin: tr.querySelector('.mem-pin').value
                     });
                 }
             });
@@ -619,7 +944,7 @@
             .then(res => res.json()).then(res => {
                 const sel = document.getElementById('memberSelect');
                 sel.innerHTML = '<option value="">請選擇成員...</option>';
-                res.data.forEach(m => { sel.innerHTML += `<option value="${m.name}">${m.name}</option>`; });
+                if (res.data) res.data.forEach(m => { sel.innerHTML += `<option value="${m.name}">${m.name}</option>`; });
             });
         }
     </script>
