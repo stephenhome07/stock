@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V2.5 小家族基金管理系統 (管理員)</title>
+    <title>V2.51 小家族基金管理系統 (管理員)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -88,6 +88,14 @@
                             <input type="number" id="txQty" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2">
                         </label>
                     </div>
+
+                    <label class="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded p-3 cursor-pointer">
+                        <input type="checkbox" id="txSkipStamp" class="w-4 h-4" onchange="updatePreview()">
+                        <span class="text-sm text-gray-800">
+                            <strong>免印花稅</strong>
+                            <span class="text-gray-500">（ETF 如 7200／7500 會自動勾選，亦可手動開關）</span>
+                        </span>
+                    </label>
 
                     <button type="button" id="btnSubmit" onclick="submitData()" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition">
                         確認送出至資料庫
@@ -537,17 +545,39 @@
             updatePreview();
         }
 
+        // 預設免印花稅代號（與後端一致）
+        const STAMP_DUTY_EXEMPT = ['7200', '7500'];
+
+        function normalizeTicker(t) {
+            return String(t || '').replace(/^0+/, '').replace(/\.0$/, '').trim();
+        }
+
+        function isExemptTicker(t) {
+            return STAMP_DUTY_EXEMPT.indexOf(normalizeTicker(t)) !== -1;
+        }
+
+        // 輸入代號時自動勾選／取消免印花稅
+        document.getElementById('txTicker').addEventListener('input', function() {
+            const t = this.value;
+            if (isExemptTicker(t)) {
+                document.getElementById('txSkipStamp').checked = true;
+            }
+            // 非名單內不強制取消，保留用戶手動設定
+            updatePreview();
+        });
+
         function updatePreview() {
             const type = document.getElementById('txType').value;
             const price = parseFloat(document.getElementById('txPrice').value) || 0;
             const qty = parseFloat(document.getElementById('txQty').value) || 0;
             const broker = document.getElementById('txBroker').value;
+            const skipStamp = document.getElementById('txSkipStamp').checked;
             if (price === 0 || qty === 0) return;
             const netValue = price * qty;
             
             let stampDuty = 0, sfcLevy = 0, ccassFee = 0, commission = 0, platformFee = 0, tradingFee = 0;
             if (broker !== "手動") {
-                stampDuty = Math.ceil(netValue * 0.001);
+                stampDuty = skipStamp ? 0 : Math.ceil(netValue * 0.001);
                 tradingFee = netValue * 0.0000565;
                 sfcLevy = netValue * 0.000027 + netValue * 0.0000015;
                 ccassFee = Math.max(2, netValue * 0.00002);
@@ -559,7 +589,7 @@
             const finalTotal = type === "買入" ? (netValue + totalFee) : (netValue - totalFee);
 
             document.getElementById('valNet').innerText = netValue.toFixed(2);
-            document.getElementById('valStamp').innerText = stampDuty.toFixed(2);
+            document.getElementById('valStamp').innerText = stampDuty.toFixed(2) + (skipStamp ? ' (免)' : '');
             document.getElementById('valSfc').innerText = (sfcLevy + tradingFee).toFixed(2);
             document.getElementById('valCcass').innerText = ccassFee.toFixed(2);
             document.getElementById('valComm').innerText = commission.toFixed(2);
@@ -599,7 +629,8 @@
                     price: parseFloat(document.getElementById('txPrice').value),
                     quantity: parseFloat(document.getElementById('txQty').value),
                     broker: document.getElementById('txBroker').value,
-                    targetPosId: selectedPosition ? selectedPosition.id : null
+                    targetPosId: selectedPosition ? selectedPosition.id : null,
+                    skipStampDuty: document.getElementById('txSkipStamp').checked
                 }
             };
             if(!data.tx.ticker || !data.tx.price || !data.tx.quantity) return alert("請填寫完整！");
