@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V2.51 小家族基金管理系統 (管理員)</title>
+    <title>V2.5 小家族基金管理系統 (管理員)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -241,14 +241,15 @@
                             <tr>
                                 <th class="p-2 rounded-tl-lg">月份</th>
                                 <th class="p-2 text-right">當月已實現利潤 ($)</th>
+                                <th class="p-2 text-right">當時總本金 ($)</th>
                                 <th class="p-2 text-right rounded-tr-lg">年化報酬率 (%)</th>
                             </tr>
                         </thead>
                         <tbody id="realizedSummaryTable" class="divide-y">
-                            <tr><td colspan="3" class="p-4 text-center text-gray-500">載入中...</td></tr>
+                            <tr><td colspan="4" class="p-4 text-center text-gray-500">載入中...</td></tr>
                         </tbody>
                     </table>
-                    <p class="text-xs text-gray-400 mt-2">年化報酬率 = (當月利潤 ÷ 總投入本金) × 12 × 100%</p>
+                    <p class="text-xs text-gray-400 mt-2">年化報酬率 = (當月利潤 ÷ <strong>該月當時總本金</strong>) × 12 × 100%（之後加資不會倒推影響歷史月份）</p>
                 </div>
 
                 <!-- 逐筆明細表 -->
@@ -363,6 +364,60 @@
                     </div>
                 </div>
 
+                <!-- 注資／提款紀錄 + 資金增長圖 -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-bold mb-4 border-b pb-2">記錄注資／提款（中途加入資金）</h3>
+                    <p class="text-xs text-gray-500 mb-3">請用此功能記錄加資，勿直接改「系統設定」本金，否則會令歷史月份年化被拉低。日期請填實際入帳日。</p>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                        <label class="block">
+                            <span class="text-gray-700 text-sm">日期</span>
+                            <input type="date" id="capDate" class="mt-1 block w-full rounded-md border p-2">
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 text-sm">類型</span>
+                            <select id="capType" class="mt-1 block w-full rounded-md border p-2">
+                                <option value="投入">投入（加資）</option>
+                                <option value="提取">提取（減資）</option>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 text-sm">金額 ($)</span>
+                            <input type="number" id="capAmount" step="0.01" class="mt-1 block w-full rounded-md border p-2" placeholder="例如 30000">
+                        </label>
+                        <label class="block md:col-span-1">
+                            <span class="text-gray-700 text-sm">備註</span>
+                            <input type="text" id="capMemo" class="mt-1 block w-full rounded-md border p-2" placeholder="可選">
+                        </label>
+                        <button onclick="submitCapital()" class="bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 h-[42px]">
+                            儲存注資
+                        </button>
+                    </div>
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="text-sm font-bold mb-2 text-gray-700">注資／提款明細</h4>
+                            <div class="overflow-x-auto max-h-48 overflow-y-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                                        <tr>
+                                            <th class="p-2">日期</th>
+                                            <th class="p-2">類型</th>
+                                            <th class="p-2 text-right">金額</th>
+                                            <th class="p-2">備註</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="memberCapitalTable" class="divide-y">
+                                        <tr><td colspan="4" class="p-3 text-center text-gray-500">暫無紀錄</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold mb-2 text-gray-700">資金累積增長</h4>
+                            <canvas id="capitalChart" height="160"></canvas>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 輸入實際派息 -->
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <h3 class="text-lg font-bold mb-4 border-b pb-2">記錄本月實際派息</h3>
@@ -471,6 +526,7 @@
 
         document.getElementById('txDate').valueAsDate = new Date();
         document.getElementById('incDate').valueAsDate = new Date();
+        document.getElementById('capDate').valueAsDate = new Date();
         // 預設派息月份為當月
         const now = new Date();
         document.getElementById('payoutMonth').value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
@@ -737,14 +793,16 @@
             if (data.monthlySummary && data.monthlySummary.length > 0) {
                 data.monthlySummary.forEach(row => {
                     const cls = row.profit >= 0 ? 'profit-green' : 'loss-red';
+                    const capBase = row.capitalBase != null ? Number(row.capitalBase).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}) : '—';
                     sumTbody.innerHTML += `<tr>
                         <td class="p-2 font-medium">${row.month}</td>
                         <td class="p-2 text-right ${cls} font-bold">$${Number(row.profit).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                        <td class="p-2 text-right text-gray-600">$${capBase}</td>
                         <td class="p-2 text-right ${cls}">${Number(row.annualizedRate).toFixed(2)}%</td>
                     </tr>`;
                 });
             } else {
-                sumTbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">暫無已實現利潤</td></tr>';
+                sumTbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">暫無已實現利潤</td></tr>';
             }
 
             // 已實現利潤 - 逐筆
@@ -792,6 +850,7 @@
 
         // ==================== 成員專區（管理員） ====================
         let currentMemberData = null;
+        let capitalChartInstance = null;
 
         function fetchMemberData() {
             const memberName = document.getElementById('memberSelect').value;
@@ -810,6 +869,7 @@
                     document.getElementById('memPaidRule').innerText = `本金 + 已派利息 $${Number(res.data.totalPaid || 0).toLocaleString()}`;
                     document.getElementById('payoutSuggested').value = res.data.monthlyDividend;
                     document.getElementById('payoutActual').value = res.data.monthlyDividend;
+                    renderCapitalHistory(res.data.capitalHistory || [], res.data.capital || 0);
                 }
             });
 
@@ -832,6 +892,108 @@
                     tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">暫無派息紀錄</td></tr>';
                 }
             });
+        }
+
+        function renderCapitalHistory(history, currentCapital) {
+            const tbody = document.getElementById('memberCapitalTable');
+            tbody.innerHTML = '';
+            if (history && history.length > 0) {
+                history.forEach(row => {
+                    const amt = Number(row.amount) || 0;
+                    const cls = amt >= 0 ? 'profit-green' : 'loss-red';
+                    const sign = amt >= 0 ? '+' : '';
+                    tbody.innerHTML += `<tr>
+                        <td class="p-2">${row.date}</td>
+                        <td class="p-2">${row.type || (amt >= 0 ? '投入' : '提取')}</td>
+                        <td class="p-2 text-right ${cls} font-bold">${sign}$${Math.abs(amt).toLocaleString()}</td>
+                        <td class="p-2 text-gray-500">${row.memo || ''}</td>
+                    </tr>`;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-gray-500">暫無注資紀錄（可在上方新增）</td></tr>';
+            }
+
+            // 累積曲線：由舊到新
+            const chronological = (history || []).slice().sort(function(a, b) {
+                return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
+            });
+            const sumAll = chronological.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+            const base = (currentCapital || 0) - sumAll;
+            const labels = [];
+            const values = [];
+            if (chronological.length === 0) {
+                labels.push('目前');
+                values.push(currentCapital || 0);
+            } else {
+                labels.push('起始');
+                values.push(base);
+                let running = base;
+                chronological.forEach(function(r) {
+                    running += parseFloat(r.amount) || 0;
+                    labels.push(r.date);
+                    values.push(Math.round(running * 100) / 100);
+                });
+            }
+
+            if (capitalChartInstance) capitalChartInstance.destroy();
+            const canvas = document.getElementById('capitalChart');
+            if (!canvas) return;
+            capitalChartInstance = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '累積本金 ($)',
+                        data: values,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.15)',
+                        fill: true,
+                        tension: 0.25,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: { callback: function(v) { return '$' + Number(v).toLocaleString(); } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function submitCapital() {
+            const memberName = document.getElementById('memberSelect').value;
+            if (!memberName) return alert('請先選擇成員');
+            const dateVal = document.getElementById('capDate').value;
+            const type = document.getElementById('capType').value;
+            const amount = parseFloat(document.getElementById('capAmount').value);
+            if (!dateVal || isNaN(amount) || amount === 0) return alert('請填寫日期與金額');
+
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'addCapitalLog',
+                    log: {
+                        member: memberName,
+                        date: dateVal,
+                        type: type,
+                        amount: amount,
+                        memo: document.getElementById('capMemo').value || ''
+                    }
+                })
+            }).then(res => res.json()).then(res => {
+                if (res.success) {
+                    alert('✅ ' + (res.message || '注資已記錄'));
+                    document.getElementById('capAmount').value = '';
+                    document.getElementById('capMemo').value = '';
+                    fetchMemberData();
+                    loadMembersDropdown(); // 刷新全體一覽本金
+                } else alert('❌ ' + (res.message || res.error));
+            }).catch(() => alert('網路錯誤'));
         }
 
         function submitPayout() {
