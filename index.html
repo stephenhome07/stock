@@ -25,6 +25,7 @@
         <div class="flex flex-wrap">
             <button onclick="switchTab('trade')" id="tab-trade" class="px-4 py-3 font-semibold border-b-4 tab-active text-sm md:text-base">新增交易</button>
             <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500 text-sm md:text-base">基金總看板</button>
+            <button onclick="switchTab('funds')" id="tab-funds" class="px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500 text-sm md:text-base">基金 vs 活期</button>
             <button onclick="switchTab('member')" id="tab-member" class="px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500 text-sm md:text-base">成員專區 (管理)</button>
             <button onclick="switchTab('settings')" id="tab-settings" class="px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-blue-500 text-sm md:text-base">系統設定</button>
         </div>
@@ -295,6 +296,125 @@
             </div>
         </div>
 
+        <!-- ==================== 基金 vs 活期 ==================== -->
+        <div id="view-funds" class="mt-4 hidden space-y-6">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-2">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">基金 vs 活期比較</h2>
+                        <p class="text-sm text-gray-500 mt-1">記錄閒置資金買入基金，對比「若只放活期」的利息差異，協助決定賣出價位</p>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <label class="block">
+                            <span class="text-gray-700 text-sm">活期年利率 (%)</span>
+                            <input type="number" id="savingsRateInput" step="0.01" value="2.95" class="mt-1 block w-28 rounded-md border p-2">
+                        </label>
+                        <button onclick="saveSavingsRate()" class="bg-gray-700 text-white px-3 py-2 rounded text-sm h-[42px]">更新利率</button>
+                        <button onclick="fetchFundData()" class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm h-[42px]">重新整理</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                    <p class="text-gray-500 text-sm">持倉投入總額</p>
+                    <h3 class="text-xl font-bold" id="fundSumInvest">$0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500">
+                    <p class="text-gray-500 text-sm">持倉最新市值</p>
+                    <h3 class="text-xl font-bold" id="fundSumValue">$0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-amber-500">
+                    <p class="text-gray-500 text-sm">若放活期至今價值</p>
+                    <h3 class="text-xl font-bold" id="fundSumSavings">$0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-emerald-500">
+                    <p class="text-gray-500 text-sm">相對活期盈虧</p>
+                    <h3 class="text-xl font-bold" id="fundSumVs">$0</h3>
+                </div>
+            </div>
+
+            <!-- 新增買入 -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-bold mb-4 border-b pb-2">記錄基金買入</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">基金名稱</span>
+                        <input type="text" id="fundName" class="mt-1 block w-full rounded-md border p-2" placeholder="例如：某某債券基金">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">買入日期</span>
+                        <input type="date" id="fundBuyDate" class="mt-1 block w-full rounded-md border p-2">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">投入金額 ($)</span>
+                        <input type="number" id="fundAmount" step="0.01" class="mt-1 block w-full rounded-md border p-2">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">單位數（可選）</span>
+                        <input type="number" id="fundUnits" step="0.0001" class="mt-1 block w-full rounded-md border p-2">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">買入價（可選）</span>
+                        <input type="number" id="fundPrice" step="0.0001" class="mt-1 block w-full rounded-md border p-2">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">備註</span>
+                        <input type="text" id="fundMemo" class="mt-1 block w-full rounded-md border p-2">
+                    </label>
+                </div>
+                <button onclick="submitFundBuy()" class="mt-4 bg-blue-600 text-white font-bold py-2 px-6 rounded hover:bg-blue-700">確認買入</button>
+            </div>
+
+            <!-- 持倉中 -->
+            <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
+                <h3 class="text-lg font-bold mb-3">持倉中（Open）</h3>
+                <p class="text-xs text-gray-500 mb-2">「打和賣出價」= 投入 + 同期活期利息。市值高於此才贏過放活期。</p>
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-600">
+                        <tr>
+                            <th class="p-2">基金</th>
+                            <th class="p-2">買入日</th>
+                            <th class="p-2 text-right">投入</th>
+                            <th class="p-2 text-right">持有天</th>
+                            <th class="p-2 text-right">最新市值</th>
+                            <th class="p-2 text-right">基金盈虧</th>
+                            <th class="p-2 text-right">活期利息</th>
+                            <th class="p-2 text-right">vs 活期</th>
+                            <th class="p-2 text-right">打和賣出價</th>
+                            <th class="p-2">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fundOpenTable" class="divide-y">
+                        <tr><td colspan="10" class="p-4 text-center text-gray-500">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 已賣出 -->
+            <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
+                <h3 class="text-lg font-bold mb-3">已賣出（Closed）</h3>
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-600">
+                        <tr>
+                            <th class="p-2">基金</th>
+                            <th class="p-2">買入日</th>
+                            <th class="p-2">賣出日</th>
+                            <th class="p-2 text-right">投入</th>
+                            <th class="p-2 text-right">賣出金額</th>
+                            <th class="p-2 text-right">持有天</th>
+                            <th class="p-2 text-right">基金盈虧</th>
+                            <th class="p-2 text-right">同期活期利息</th>
+                            <th class="p-2 text-right">vs 活期</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fundClosedTable" class="divide-y">
+                        <tr><td colspan="9" class="p-4 text-center text-gray-500">暫無紀錄</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- ==================== 成員專區 (管理員：計算建議派息 + 輸入實際派息) ==================== -->
         <div id="view-member" class="mt-4 hidden space-y-6">
             <div class="bg-white p-6 rounded-lg shadow-md flex flex-wrap justify-between items-center gap-4">
@@ -500,7 +620,7 @@
 
         // ==================== 視圖切換與初始化 ====================
         function switchTab(tabName) {
-            ['trade', 'dashboard', 'member', 'settings'].forEach(name => {
+            ['trade', 'dashboard', 'funds', 'member', 'settings'].forEach(name => {
                 const viewEl = document.getElementById('view-' + name);
                 const tabEl = document.getElementById('tab-' + name);
                 if (viewEl) viewEl.classList.add('hidden');
@@ -520,6 +640,7 @@
             }
 
             if(tabName === 'dashboard') fetchDashboardData();
+            if(tabName === 'funds') fetchFundData();
             if(tabName === 'member') loadMembersDropdown();
             if(tabName === 'settings') loadSettings();
         }
@@ -966,12 +1087,21 @@
         }
 
         function submitCapital() {
-            const memberName = document.getElementById('memberSelect').value;
-            if (!memberName) return alert('請先選擇成員');
+            const memberName = (document.getElementById('memberSelect').value || '').trim();
+            if (!memberName) {
+                alert('請先在上方下拉選單選擇成員，再記錄注資。');
+                return;
+            }
             const dateVal = document.getElementById('capDate').value;
             const type = document.getElementById('capType').value;
             const amount = parseFloat(document.getElementById('capAmount').value);
-            if (!dateVal || isNaN(amount) || amount === 0) return alert('請填寫日期與金額');
+            if (!dateVal || isNaN(amount) || amount === 0) {
+                alert('請填寫日期與金額');
+                return;
+            }
+
+            const btn = document.querySelector('button[onclick="submitCapital()"]');
+            if (btn) { btn.disabled = true; btn.innerText = '儲存中...'; }
 
             fetch(GOOGLE_APP_SCRIPT_URL, {
                 method: 'POST',
@@ -986,14 +1116,21 @@
                     }
                 })
             }).then(res => res.json()).then(res => {
+                if (btn) { btn.disabled = false; btn.innerText = '儲存注資'; }
                 if (res.success) {
                     alert('✅ ' + (res.message || '注資已記錄'));
                     document.getElementById('capAmount').value = '';
                     document.getElementById('capMemo').value = '';
                     fetchMemberData();
-                    loadMembersDropdown(); // 刷新全體一覽本金
-                } else alert('❌ ' + (res.message || res.error));
-            }).catch(() => alert('網路錯誤'));
+                    loadMembersDropdown();
+                } else {
+                    alert('❌ ' + (res.message || res.error || '儲存失敗') +
+                      '\n\n若出現「未知 action: addCapitalLog」，代表 Apps Script 尚未更新／重新部署。');
+                }
+            }).catch(() => {
+                if (btn) { btn.disabled = false; btn.innerText = '儲存注資'; }
+                alert('網路錯誤');
+            });
         }
 
         function submitPayout() {
@@ -1109,6 +1246,167 @@
                     tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">無成員資料</td></tr>';
                 }
             });
+        }
+
+        // ==================== 基金 vs 活期 ====================
+        function money(n) {
+            return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function fetchFundData() {
+            fetch(GOOGLE_APP_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getFundComparison' }) })
+            .then(res => res.json()).then(res => {
+                if (!res.success) {
+                    alert('❌ ' + (res.message || res.error || '載入失敗') + '\n若出現未知 action，請重新部署 Apps Script。');
+                    return;
+                }
+                const d = res.data;
+                document.getElementById('savingsRateInput').value = d.savingsRate;
+                const s = d.summary || {};
+                document.getElementById('fundSumInvest').innerText = money(s.openInvest);
+                document.getElementById('fundSumValue').innerText = money(s.openFundValue);
+                document.getElementById('fundSumSavings').innerText = money(s.openSavingsValue);
+                const vsEl = document.getElementById('fundSumVs');
+                vsEl.innerText = money(s.openVsSavings);
+                vsEl.className = 'text-xl font-bold ' + ((s.openVsSavings || 0) >= 0 ? 'profit-green' : 'loss-red');
+
+                const openBody = document.getElementById('fundOpenTable');
+                openBody.innerHTML = '';
+                if (d.open && d.open.length) {
+                    d.open.forEach(row => {
+                        const vsCls = row.vsSavings >= 0 ? 'profit-green' : 'loss-red';
+                        const pnlCls = row.fundProfit >= 0 ? 'profit-green' : 'loss-red';
+                        openBody.innerHTML += `<tr>
+                            <td class="p-2 font-medium">${row.name}</td>
+                            <td class="p-2 text-gray-500">${row.buyDate}</td>
+                            <td class="p-2 text-right">${money(row.invest)}</td>
+                            <td class="p-2 text-right">${row.days}</td>
+                            <td class="p-2 text-right">
+                                <input type="number" step="0.01" value="${row.currentValue}" class="border p-1 w-28 text-right fund-val" data-id="${row.id}">
+                                <button onclick="updateFundVal('${row.id}', this)" class="text-xs text-blue-600 ml-1">存</button>
+                            </td>
+                            <td class="p-2 text-right ${pnlCls} font-bold">${money(row.fundProfit)}</td>
+                            <td class="p-2 text-right text-gray-600">${money(row.savingsInterest)}</td>
+                            <td class="p-2 text-right ${vsCls} font-bold">${money(row.vsSavings)}</td>
+                            <td class="p-2 text-right font-medium text-amber-700">${money(row.breakeven)}</td>
+                            <td class="p-2 whitespace-nowrap">
+                                <button onclick="promptSellFund('${row.id}', '${row.name}', ${row.breakeven})" class="text-sm bg-emerald-600 text-white px-2 py-1 rounded">賣出</button>
+                            </td>
+                        </tr>`;
+                    });
+                } else {
+                    openBody.innerHTML = '<tr><td colspan="10" class="p-4 text-center text-gray-500">暫無持倉基金</td></tr>';
+                }
+
+                const closedBody = document.getElementById('fundClosedTable');
+                closedBody.innerHTML = '';
+                if (d.closed && d.closed.length) {
+                    d.closed.forEach(row => {
+                        const vsCls = row.vsSavings >= 0 ? 'profit-green' : 'loss-red';
+                        const pnlCls = row.fundProfit >= 0 ? 'profit-green' : 'loss-red';
+                        closedBody.innerHTML += `<tr>
+                            <td class="p-2 font-medium">${row.name}</td>
+                            <td class="p-2 text-gray-500">${row.buyDate}</td>
+                            <td class="p-2 text-gray-500">${row.sellDate}</td>
+                            <td class="p-2 text-right">${money(row.invest)}</td>
+                            <td class="p-2 text-right">${money(row.sellAmount)}</td>
+                            <td class="p-2 text-right">${row.days}</td>
+                            <td class="p-2 text-right ${pnlCls} font-bold">${money(row.fundProfit)}</td>
+                            <td class="p-2 text-right text-gray-600">${money(row.savingsInterest)}</td>
+                            <td class="p-2 text-right ${vsCls} font-bold">${money(row.vsSavings)}</td>
+                        </tr>`;
+                    });
+                } else {
+                    closedBody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-gray-500">暫無已賣出紀錄</td></tr>';
+                }
+            }).catch(() => alert('網路錯誤'));
+        }
+
+        function submitFundBuy() {
+            const name = (document.getElementById('fundName').value || '').trim();
+            const date = document.getElementById('fundBuyDate').value;
+            const amount = parseFloat(document.getElementById('fundAmount').value);
+            if (!name || !date || isNaN(amount) || amount <= 0) {
+                alert('請填寫基金名稱、買入日期與投入金額');
+                return;
+            }
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'addFundBuy',
+                    log: {
+                        name: name,
+                        date: date,
+                        amount: amount,
+                        units: document.getElementById('fundUnits').value,
+                        price: document.getElementById('fundPrice').value,
+                        memo: document.getElementById('fundMemo').value
+                    }
+                })
+            }).then(res => res.json()).then(res => {
+                if (res.success) {
+                    alert('✅ ' + res.message);
+                    document.getElementById('fundName').value = '';
+                    document.getElementById('fundAmount').value = '';
+                    document.getElementById('fundUnits').value = '';
+                    document.getElementById('fundPrice').value = '';
+                    document.getElementById('fundMemo').value = '';
+                    fetchFundData();
+                } else alert('❌ ' + (res.message || res.error));
+            }).catch(() => alert('網路錯誤'));
+        }
+
+        function updateFundVal(id, btn) {
+            const input = btn.parentElement.querySelector('.fund-val');
+            const val = parseFloat(input.value);
+            if (isNaN(val) || val < 0) return alert('市值無效');
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'updateFundValue', log: { id: id, currentValue: val } })
+            }).then(res => res.json()).then(res => {
+                if (res.success) fetchFundData();
+                else alert('❌ ' + (res.message || res.error));
+            });
+        }
+
+        function promptSellFund(id, name, breakeven) {
+            const amtStr = prompt('賣出「' + name + '」\n打和賣出價約 ' + money(breakeven) + '\n請輸入實際賣出總金額：', String(breakeven));
+            if (amtStr === null) return;
+            const sellAmount = parseFloat(amtStr);
+            if (isNaN(sellAmount) || sellAmount < 0) return alert('金額無效');
+            const sellDate = prompt('賣出日期 (yyyy-mm-dd)', new Date().toISOString().slice(0, 10));
+            if (!sellDate) return;
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'sellFund',
+                    log: { id: id, sellAmount: sellAmount, sellDate: sellDate }
+                })
+            }).then(res => res.json()).then(res => {
+                if (res.success) {
+                    alert('✅ ' + res.message);
+                    fetchFundData();
+                } else alert('❌ ' + (res.message || res.error));
+            });
+        }
+
+        function saveSavingsRate() {
+            const rate = parseFloat(document.getElementById('savingsRateInput').value);
+            if (isNaN(rate) || rate < 0) return alert('利率無效');
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'setSavingsRate', rate: rate })
+            }).then(res => res.json()).then(res => {
+                if (res.success) {
+                    alert('✅ ' + (res.message || '已更新'));
+                    fetchFundData();
+                } else alert('❌ ' + (res.message || res.error));
+            });
+        }
+
+        // 基金買入日期預設今天
+        if (document.getElementById('fundBuyDate')) {
+            document.getElementById('fundBuyDate').valueAsDate = new Date();
         }
     </script>
 </body>
