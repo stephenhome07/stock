@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V2.5 小家族基金管理系統 (管理員)</title>
+    <title>V2.61 小家族基金管理系統 (管理員)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -366,27 +366,29 @@
                 <button onclick="submitFundBuy()" class="mt-4 bg-blue-600 text-white font-bold py-2 px-6 rounded hover:bg-blue-700">確認買入</button>
             </div>
 
-            <!-- 持倉中 -->
+            <!-- 持倉中（按基金名稱合併） -->
             <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
-                <h3 class="text-lg font-bold mb-3">持倉中（Open）</h3>
-                <p class="text-xs text-gray-500 mb-2">「打和賣出價」= 投入 + 同期活期利息。市值高於此才贏過放活期。</p>
+                <h3 class="text-lg font-bold mb-3">持倉中（Open）· 同名基金已合併</h3>
+                <p class="text-xs text-gray-500 mb-2">多筆買入按名稱合併；活期利息／天數按每筆分開計再加總。年化＝(盈虧÷投入)×(365÷加權持有天)×100%。點「展開」可更新每筆市值或單獨賣出。</p>
                 <table class="w-full text-sm text-left">
                     <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="p-2">基金</th>
-                            <th class="p-2">買入日</th>
-                            <th class="p-2 text-right">投入</th>
-                            <th class="p-2 text-right">持有天</th>
+                            <th class="p-2 text-right">批數</th>
+                            <th class="p-2 text-right">總投入</th>
+                            <th class="p-2 text-right">加權天</th>
                             <th class="p-2 text-right">最新市值</th>
                             <th class="p-2 text-right">基金盈虧</th>
+                            <th class="p-2 text-right">年化%</th>
                             <th class="p-2 text-right">活期利息</th>
                             <th class="p-2 text-right">vs 活期</th>
+                            <th class="p-2 text-right">vs年化%</th>
                             <th class="p-2 text-right">打和賣出價</th>
-                            <th class="p-2">操作</th>
+                            <th class="p-2">明細</th>
                         </tr>
                     </thead>
                     <tbody id="fundOpenTable" class="divide-y">
-                        <tr><td colspan="10" class="p-4 text-center text-gray-500">載入中...</td></tr>
+                        <tr><td colspan="12" class="p-4 text-center text-gray-500">載入中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -404,12 +406,14 @@
                             <th class="p-2 text-right">賣出金額</th>
                             <th class="p-2 text-right">持有天</th>
                             <th class="p-2 text-right">基金盈虧</th>
+                            <th class="p-2 text-right">年化%</th>
                             <th class="p-2 text-right">同期活期利息</th>
                             <th class="p-2 text-right">vs 活期</th>
+                            <th class="p-2 text-right">vs年化%</th>
                         </tr>
                     </thead>
                     <tbody id="fundClosedTable" class="divide-y">
-                        <tr><td colspan="9" class="p-4 text-center text-gray-500">暫無紀錄</td></tr>
+                        <tr><td colspan="11" class="p-4 text-center text-gray-500">暫無紀錄</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1272,30 +1276,71 @@
 
                 const openBody = document.getElementById('fundOpenTable');
                 openBody.innerHTML = '';
-                if (d.open && d.open.length) {
-                    d.open.forEach(row => {
-                        const vsCls = row.vsSavings >= 0 ? 'profit-green' : 'loss-red';
-                        const pnlCls = row.fundProfit >= 0 ? 'profit-green' : 'loss-red';
+                const groups = (d.openGrouped && d.openGrouped.length) ? d.openGrouped : null;
+                if (groups) {
+                    groups.forEach((g, gi) => {
+                        const vsCls = g.vsSavings >= 0 ? 'profit-green' : 'loss-red';
+                        const pnlCls = g.fundProfit >= 0 ? 'profit-green' : 'loss-red';
+                        const annCls = g.fundAnnualized >= 0 ? 'profit-green' : 'loss-red';
+                        const detailId = 'fundDetail_' + gi;
                         openBody.innerHTML += `<tr>
-                            <td class="p-2 font-medium">${row.name}</td>
-                            <td class="p-2 text-gray-500">${row.buyDate}</td>
-                            <td class="p-2 text-right">${money(row.invest)}</td>
-                            <td class="p-2 text-right">${row.days}</td>
-                            <td class="p-2 text-right">
-                                <input type="number" step="0.01" value="${row.currentValue}" class="border p-1 w-28 text-right fund-val" data-id="${row.id}">
-                                <button onclick="updateFundVal('${row.id}', this)" class="text-xs text-blue-600 ml-1">存</button>
-                            </td>
-                            <td class="p-2 text-right ${pnlCls} font-bold">${money(row.fundProfit)}</td>
-                            <td class="p-2 text-right text-gray-600">${money(row.savingsInterest)}</td>
-                            <td class="p-2 text-right ${vsCls} font-bold">${money(row.vsSavings)}</td>
-                            <td class="p-2 text-right font-medium text-amber-700">${money(row.breakeven)}</td>
-                            <td class="p-2 whitespace-nowrap">
-                                <button onclick="promptSellFund('${row.id}', '${row.name}', ${row.breakeven})" class="text-sm bg-emerald-600 text-white px-2 py-1 rounded">賣出</button>
+                            <td class="p-2 font-medium">${g.name}</td>
+                            <td class="p-2 text-right">${g.lotCount}</td>
+                            <td class="p-2 text-right">${money(g.invest)}</td>
+                            <td class="p-2 text-right">${g.avgDays}</td>
+                            <td class="p-2 text-right font-bold">${money(g.currentValue)}</td>
+                            <td class="p-2 text-right ${pnlCls} font-bold">${money(g.fundProfit)}</td>
+                            <td class="p-2 text-right ${annCls} font-bold">${Number(g.fundAnnualized).toFixed(2)}%</td>
+                            <td class="p-2 text-right text-gray-600">${money(g.savingsInterest)}</td>
+                            <td class="p-2 text-right ${vsCls} font-bold">${money(g.vsSavings)}</td>
+                            <td class="p-2 text-right ${vsCls}">${Number(g.vsSavingsAnnualized).toFixed(2)}%</td>
+                            <td class="p-2 text-right font-medium text-amber-700">${money(g.breakeven)}</td>
+                            <td class="p-2"><button type="button" class="text-xs text-blue-600 underline" onclick="document.getElementById('${detailId}').classList.toggle('hidden')">展開</button></td>
+                        </tr>
+                        <tr id="${detailId}" class="hidden bg-slate-50">
+                            <td colspan="12" class="p-3">
+                                <table class="w-full text-xs">
+                                    <thead class="text-gray-500">
+                                        <tr>
+                                            <th class="p-1 text-left">買入日</th>
+                                            <th class="p-1 text-right">投入</th>
+                                            <th class="p-1 text-right">天</th>
+                                            <th class="p-1 text-right">市值</th>
+                                            <th class="p-1 text-right">盈虧</th>
+                                            <th class="p-1 text-right">年化%</th>
+                                            <th class="p-1 text-right">活期息</th>
+                                            <th class="p-1 text-right">vs活期</th>
+                                            <th class="p-1 text-right">打和價</th>
+                                            <th class="p-1">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${(g.lots || []).map(lot => {
+                                            const lVs = lot.vsSavings >= 0 ? 'profit-green' : 'loss-red';
+                                            const lPn = lot.fundProfit >= 0 ? 'profit-green' : 'loss-red';
+                                            return `<tr>
+                                                <td class="p-1">${lot.buyDate}</td>
+                                                <td class="p-1 text-right">${money(lot.invest)}</td>
+                                                <td class="p-1 text-right">${lot.days}</td>
+                                                <td class="p-1 text-right">
+                                                    <input type="number" step="0.01" value="${lot.currentValue}" class="border p-0.5 w-24 text-right fund-val" data-id="${lot.id}">
+                                                    <button onclick="updateFundVal('${lot.id}', this)" class="text-blue-600 ml-1">存</button>
+                                                </td>
+                                                <td class="p-1 text-right ${lPn}">${money(lot.fundProfit)}</td>
+                                                <td class="p-1 text-right ${lPn}">${Number(lot.fundAnnualized).toFixed(2)}%</td>
+                                                <td class="p-1 text-right">${money(lot.savingsInterest)}</td>
+                                                <td class="p-1 text-right ${lVs}">${money(lot.vsSavings)}</td>
+                                                <td class="p-1 text-right text-amber-700">${money(lot.breakeven)}</td>
+                                                <td class="p-1"><button onclick="promptSellFund('${lot.id}', '${lot.name}', ${lot.breakeven})" class="bg-emerald-600 text-white px-2 py-0.5 rounded">賣出</button></td>
+                                            </tr>`;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
                             </td>
                         </tr>`;
                     });
                 } else {
-                    openBody.innerHTML = '<tr><td colspan="10" class="p-4 text-center text-gray-500">暫無持倉基金</td></tr>';
+                    openBody.innerHTML = '<tr><td colspan="12" class="p-4 text-center text-gray-500">暫無持倉基金</td></tr>';
                 }
 
                 const closedBody = document.getElementById('fundClosedTable');
@@ -1312,12 +1357,14 @@
                             <td class="p-2 text-right">${money(row.sellAmount)}</td>
                             <td class="p-2 text-right">${row.days}</td>
                             <td class="p-2 text-right ${pnlCls} font-bold">${money(row.fundProfit)}</td>
+                            <td class="p-2 text-right ${pnlCls}">${Number(row.fundAnnualized || 0).toFixed(2)}%</td>
                             <td class="p-2 text-right text-gray-600">${money(row.savingsInterest)}</td>
                             <td class="p-2 text-right ${vsCls} font-bold">${money(row.vsSavings)}</td>
+                            <td class="p-2 text-right ${vsCls}">${Number(row.vsSavingsAnnualized || 0).toFixed(2)}%</td>
                         </tr>`;
                     });
                 } else {
-                    closedBody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-gray-500">暫無已賣出紀錄</td></tr>';
+                    closedBody.innerHTML = '<tr><td colspan="11" class="p-4 text-center text-gray-500">暫無已賣出紀錄</td></tr>';
                 }
             }).catch(() => alert('網路錯誤'));
         }
