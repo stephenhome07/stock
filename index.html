@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V2.61 小家族基金管理系統 (管理員)</title>
+    <title>V2.62 小家族基金管理系統 (管理員)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -337,10 +337,12 @@
             <!-- 新增買入 -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h3 class="text-lg font-bold mb-4 border-b pb-2">記錄基金買入</h3>
+                <p class="text-xs text-gray-500 mb-3">單位數必須填寫，之後只需輸入「基金現價」，系統會自動用 單位×現價 計算各批市值。</p>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <label class="block">
-                        <span class="text-gray-700 text-sm">基金名稱</span>
-                        <input type="text" id="fundName" class="mt-1 block w-full rounded-md border p-2" placeholder="例如：某某債券基金">
+                    <label class="block md:col-span-1">
+                        <span class="text-gray-700 text-sm">基金名稱（可選已有或自填新名稱）</span>
+                        <input type="text" id="fundName" list="fundNameList" class="mt-1 block w-full rounded-md border p-2" placeholder="輸入或選擇基金">
+                        <datalist id="fundNameList"></datalist>
                     </label>
                     <label class="block">
                         <span class="text-gray-700 text-sm">買入日期</span>
@@ -351,11 +353,11 @@
                         <input type="number" id="fundAmount" step="0.01" class="mt-1 block w-full rounded-md border p-2">
                     </label>
                     <label class="block">
-                        <span class="text-gray-700 text-sm">單位數（可選）</span>
-                        <input type="number" id="fundUnits" step="0.0001" class="mt-1 block w-full rounded-md border p-2">
+                        <span class="text-gray-700 text-sm">單位數 <span class="text-red-500">*必填</span></span>
+                        <input type="number" id="fundUnits" step="0.0001" class="mt-1 block w-full rounded-md border p-2" placeholder="例如 1234.56">
                     </label>
                     <label class="block">
-                        <span class="text-gray-700 text-sm">買入價（可選）</span>
+                        <span class="text-gray-700 text-sm">買入價（可選，不填則用 金額÷單位）</span>
                         <input type="number" id="fundPrice" step="0.0001" class="mt-1 block w-full rounded-md border p-2">
                     </label>
                     <label class="block">
@@ -369,7 +371,7 @@
             <!-- 持倉中（按基金名稱合併） -->
             <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
                 <h3 class="text-lg font-bold mb-3">持倉中（Open）· 同名基金已合併</h3>
-                <p class="text-xs text-gray-500 mb-2">多筆買入按名稱合併；活期利息／天數按每筆分開計再加總。年化＝(盈虧÷投入)×(365÷加權持有天)×100%。點「展開」可更新每筆市值或單獨賣出。</p>
+                <p class="text-xs text-gray-500 mb-2">同名合併顯示。更新時只需填「現價」，系統用 各批單位×現價 自動計市值。可「全部賣出」或展開後單批賣出。</p>
                 <table class="w-full text-sm text-left">
                     <thead class="bg-gray-50 text-gray-600">
                         <tr>
@@ -1274,6 +1276,15 @@
                 vsEl.innerText = money(s.openVsSavings);
                 vsEl.className = 'text-xl font-bold ' + ((s.openVsSavings || 0) >= 0 ? 'profit-green' : 'loss-red');
 
+                // 基金名稱預選清單
+                const dl = document.getElementById('fundNameList');
+                if (dl) {
+                    dl.innerHTML = '';
+                    (d.fundNames || []).forEach(n => {
+                        dl.innerHTML += `<option value="${n}">`;
+                    });
+                }
+
                 const openBody = document.getElementById('fundOpenTable');
                 openBody.innerHTML = '';
                 const groups = (d.openGrouped && d.openGrouped.length) ? d.openGrouped : null;
@@ -1283,6 +1294,7 @@
                         const pnlCls = g.fundProfit >= 0 ? 'profit-green' : 'loss-red';
                         const annCls = g.fundAnnualized >= 0 ? 'profit-green' : 'loss-red';
                         const detailId = 'fundDetail_' + gi;
+                        const safeName = String(g.name).replace(/'/g, "\\'");
                         openBody.innerHTML += `<tr>
                             <td class="p-2 font-medium">${g.name}</td>
                             <td class="p-2 text-right">${g.lotCount}</td>
@@ -1295,15 +1307,27 @@
                             <td class="p-2 text-right ${vsCls} font-bold">${money(g.vsSavings)}</td>
                             <td class="p-2 text-right ${vsCls}">${Number(g.vsSavingsAnnualized).toFixed(2)}%</td>
                             <td class="p-2 text-right font-medium text-amber-700">${money(g.breakeven)}</td>
-                            <td class="p-2"><button type="button" class="text-xs text-blue-600 underline" onclick="document.getElementById('${detailId}').classList.toggle('hidden')">展開</button></td>
+                            <td class="p-2 whitespace-nowrap">
+                                <button type="button" class="text-xs text-blue-600 underline mr-1" onclick="document.getElementById('${detailId}').classList.toggle('hidden')">展開</button>
+                            </td>
                         </tr>
                         <tr id="${detailId}" class="hidden bg-slate-50">
-                            <td colspan="12" class="p-3">
+                            <td colspan="12" class="p-3 space-y-3">
+                                <div class="flex flex-wrap items-end gap-2 bg-white border rounded p-3">
+                                    <label class="text-xs">
+                                        <span class="text-gray-600">基金現價（單位價）</span>
+                                        <input type="number" step="0.0001" id="fundPrice_${gi}" class="mt-1 block border p-1 w-32 rounded" placeholder="例如 1.023">
+                                    </label>
+                                    <button onclick="updateFundPriceByName('${safeName}', 'fundPrice_${gi}')" class="bg-indigo-600 text-white text-xs px-3 py-2 rounded">用現價更新全部市值</button>
+                                    <button onclick="promptSellAllFund('${safeName}', ${g.breakeven})" class="bg-emerald-600 text-white text-xs px-3 py-2 rounded">一鍵全部賣出</button>
+                                    <span class="text-xs text-gray-400">市值 = 各批單位數 × 現價</span>
+                                </div>
                                 <table class="w-full text-xs">
                                     <thead class="text-gray-500">
                                         <tr>
                                             <th class="p-1 text-left">買入日</th>
                                             <th class="p-1 text-right">投入</th>
+                                            <th class="p-1 text-right">單位</th>
                                             <th class="p-1 text-right">天</th>
                                             <th class="p-1 text-right">市值</th>
                                             <th class="p-1 text-right">盈虧</th>
@@ -1318,20 +1342,19 @@
                                         ${(g.lots || []).map(lot => {
                                             const lVs = lot.vsSavings >= 0 ? 'profit-green' : 'loss-red';
                                             const lPn = lot.fundProfit >= 0 ? 'profit-green' : 'loss-red';
+                                            const unitsStr = lot.units !== '' && lot.units != null ? lot.units : '—';
                                             return `<tr>
                                                 <td class="p-1">${lot.buyDate}</td>
                                                 <td class="p-1 text-right">${money(lot.invest)}</td>
+                                                <td class="p-1 text-right">${unitsStr}</td>
                                                 <td class="p-1 text-right">${lot.days}</td>
-                                                <td class="p-1 text-right">
-                                                    <input type="number" step="0.01" value="${lot.currentValue}" class="border p-0.5 w-24 text-right fund-val" data-id="${lot.id}">
-                                                    <button onclick="updateFundVal('${lot.id}', this)" class="text-blue-600 ml-1">存</button>
-                                                </td>
+                                                <td class="p-1 text-right">${money(lot.currentValue)}</td>
                                                 <td class="p-1 text-right ${lPn}">${money(lot.fundProfit)}</td>
                                                 <td class="p-1 text-right ${lPn}">${Number(lot.fundAnnualized).toFixed(2)}%</td>
                                                 <td class="p-1 text-right">${money(lot.savingsInterest)}</td>
                                                 <td class="p-1 text-right ${lVs}">${money(lot.vsSavings)}</td>
                                                 <td class="p-1 text-right text-amber-700">${money(lot.breakeven)}</td>
-                                                <td class="p-1"><button onclick="promptSellFund('${lot.id}', '${lot.name}', ${lot.breakeven})" class="bg-emerald-600 text-white px-2 py-0.5 rounded">賣出</button></td>
+                                                <td class="p-1"><button onclick="promptSellFund('${lot.id}', '${safeName}', ${lot.breakeven})" class="bg-emerald-600 text-white px-2 py-0.5 rounded">賣出此批</button></td>
                                             </tr>`;
                                         }).join('')}
                                     </tbody>
@@ -1373,8 +1396,13 @@
             const name = (document.getElementById('fundName').value || '').trim();
             const date = document.getElementById('fundBuyDate').value;
             const amount = parseFloat(document.getElementById('fundAmount').value);
+            const units = parseFloat(document.getElementById('fundUnits').value);
             if (!name || !date || isNaN(amount) || amount <= 0) {
                 alert('請填寫基金名稱、買入日期與投入金額');
+                return;
+            }
+            if (isNaN(units) || units <= 0) {
+                alert('請填寫單位數（之後才能用現價自動計算市值）');
                 return;
             }
             fetch(GOOGLE_APP_SCRIPT_URL, {
@@ -1385,7 +1413,7 @@
                         name: name,
                         date: date,
                         amount: amount,
-                        units: document.getElementById('fundUnits').value,
+                        units: units,
                         price: document.getElementById('fundPrice').value,
                         memo: document.getElementById('fundMemo').value
                     }
@@ -1403,21 +1431,22 @@
             }).catch(() => alert('網路錯誤'));
         }
 
-        function updateFundVal(id, btn) {
-            const input = btn.parentElement.querySelector('.fund-val');
-            const val = parseFloat(input.value);
-            if (isNaN(val) || val < 0) return alert('市值無效');
+        function updateFundPriceByName(name, inputId) {
+            const price = parseFloat(document.getElementById(inputId).value);
+            if (isNaN(price) || price < 0) return alert('請輸入有效現價');
             fetch(GOOGLE_APP_SCRIPT_URL, {
                 method: 'POST',
-                body: JSON.stringify({ action: 'updateFundValue', log: { id: id, currentValue: val } })
+                body: JSON.stringify({ action: 'updateFundPriceByName', log: { name: name, price: price } })
             }).then(res => res.json()).then(res => {
-                if (res.success) fetchFundData();
-                else alert('❌ ' + (res.message || res.error));
-            });
+                if (res.success) {
+                    alert('✅ ' + res.message);
+                    fetchFundData();
+                } else alert('❌ ' + (res.message || res.error));
+            }).catch(() => alert('網路錯誤'));
         }
 
         function promptSellFund(id, name, breakeven) {
-            const amtStr = prompt('賣出「' + name + '」\n打和賣出價約 ' + money(breakeven) + '\n請輸入實際賣出總金額：', String(breakeven));
+            const amtStr = prompt('賣出此批「' + name + '」\n打和賣出價約 ' + money(breakeven) + '\n請輸入實際賣出總金額：', String(breakeven));
             if (amtStr === null) return;
             const sellAmount = parseFloat(amtStr);
             if (isNaN(sellAmount) || sellAmount < 0) return alert('金額無效');
@@ -1435,6 +1464,38 @@
                     fetchFundData();
                 } else alert('❌ ' + (res.message || res.error));
             });
+        }
+
+        function promptSellAllFund(name, breakeven) {
+            const mode = prompt(
+                '一鍵賣出「' + name + '」全部持倉\n打和總價約 ' + money(breakeven) +
+                '\n\n輸入方式二選一：\nA) 直接輸入「單位賣出價」（例如 1.05）\nB) 輸入總賣出金額（例如 20100）\n\n請輸入數字：',
+                ''
+            );
+            if (mode === null || mode === '') return;
+            const num = parseFloat(mode);
+            if (isNaN(num) || num < 0) return alert('數字無效');
+            const sellDate = prompt('賣出日期 (yyyy-mm-dd)', new Date().toISOString().slice(0, 10));
+            if (!sellDate) return;
+
+            // 小於 100 當單位價；否則當總額（可再確認）
+            let log;
+            if (num < 100) {
+                if (!confirm('將以「單位賣出價 = ' + num + '」計算各批賣出金額（單位×賣出價）。確定？')) return;
+                log = { name: name, sellPrice: num, sellDate: sellDate };
+            } else {
+                if (!confirm('將以「總賣出金額 = $' + num + '」按單位比例分攤各批。確定？')) return;
+                log = { name: name, sellAmount: num, sellDate: sellDate };
+            }
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'sellFundByName', log: log })
+            }).then(res => res.json()).then(res => {
+                if (res.success) {
+                    alert('✅ ' + res.message);
+                    fetchFundData();
+                } else alert('❌ ' + (res.message || res.error));
+            }).catch(() => alert('網路錯誤'));
         }
 
         function saveSavingsRate() {
