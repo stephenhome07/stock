@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V2.62 小家族基金管理系統 (管理員)</title>
+    <title>V2.5 小家族基金管理系統 (管理員)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -368,6 +368,31 @@
                 <button onclick="submitFundBuy()" class="mt-4 bg-blue-600 text-white font-bold py-2 px-6 rounded hover:bg-blue-700">確認買入</button>
             </div>
 
+            <!-- 記錄派息 -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-bold mb-2 border-b pb-2">記錄基金派息</h3>
+                <p class="text-xs text-gray-500 mb-3">派息會計入該基金盈虧與年化%（按各批投入比例分攤到持有期間的批次）。</p>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">基金名稱</span>
+                        <input type="text" id="divFundName" list="fundNameList" class="mt-1 block w-full rounded-md border p-2" placeholder="選擇或輸入">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">派息日期</span>
+                        <input type="date" id="divDate" class="mt-1 block w-full rounded-md border p-2">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">派息金額 ($)</span>
+                        <input type="number" id="divAmount" step="0.01" class="mt-1 block w-full rounded-md border p-2">
+                    </label>
+                    <label class="block">
+                        <span class="text-gray-700 text-sm">備註</span>
+                        <input type="text" id="divMemo" class="mt-1 block w-full rounded-md border p-2" placeholder="可選">
+                    </label>
+                </div>
+                <button onclick="submitFundDividend()" class="mt-4 bg-amber-600 text-white font-bold py-2 px-6 rounded hover:bg-amber-700">儲存派息</button>
+            </div>
+
             <!-- 持倉中（按基金名稱合併） -->
             <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
                 <h3 class="text-lg font-bold mb-3">持倉中（Open）· 同名基金已合併</h3>
@@ -380,6 +405,7 @@
                             <th class="p-2 text-right">總投入</th>
                             <th class="p-2 text-right">加權天</th>
                             <th class="p-2 text-right">最新市值</th>
+                            <th class="p-2 text-right">派息</th>
                             <th class="p-2 text-right">基金盈虧</th>
                             <th class="p-2 text-right">年化%</th>
                             <th class="p-2 text-right">活期利息</th>
@@ -390,7 +416,7 @@
                         </tr>
                     </thead>
                     <tbody id="fundOpenTable" class="divide-y">
-                        <tr><td colspan="12" class="p-4 text-center text-gray-500">載入中...</td></tr>
+                        <tr><td colspan="13" class="p-4 text-center text-gray-500">載入中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -407,6 +433,7 @@
                             <th class="p-2 text-right">投入</th>
                             <th class="p-2 text-right">賣出金額</th>
                             <th class="p-2 text-right">持有天</th>
+                            <th class="p-2 text-right">派息</th>
                             <th class="p-2 text-right">基金盈虧</th>
                             <th class="p-2 text-right">年化%</th>
                             <th class="p-2 text-right">同期活期利息</th>
@@ -1301,6 +1328,7 @@
                             <td class="p-2 text-right">${money(g.invest)}</td>
                             <td class="p-2 text-right">${g.avgDays}</td>
                             <td class="p-2 text-right font-bold">${money(g.currentValue)}</td>
+                            <td class="p-2 text-right text-amber-700">${money(g.dividend || 0)}</td>
                             <td class="p-2 text-right ${pnlCls} font-bold">${money(g.fundProfit)}</td>
                             <td class="p-2 text-right ${annCls} font-bold">${Number(g.fundAnnualized).toFixed(2)}%</td>
                             <td class="p-2 text-right text-gray-600">${money(g.savingsInterest)}</td>
@@ -1312,7 +1340,7 @@
                             </td>
                         </tr>
                         <tr id="${detailId}" class="hidden bg-slate-50">
-                            <td colspan="12" class="p-3 space-y-3">
+                            <td colspan="13" class="p-3 space-y-3">
                                 <div class="flex flex-wrap items-end gap-2 bg-white border rounded p-3">
                                     <label class="text-xs">
                                         <span class="text-gray-600">基金現價（單位價）</span>
@@ -1320,8 +1348,9 @@
                                     </label>
                                     <button onclick="updateFundPriceByName('${safeName}', 'fundPrice_${gi}')" class="bg-indigo-600 text-white text-xs px-3 py-2 rounded">用現價更新全部市值</button>
                                     <button onclick="promptSellAllFund('${safeName}', ${g.breakeven})" class="bg-emerald-600 text-white text-xs px-3 py-2 rounded">一鍵全部賣出</button>
-                                    <span class="text-xs text-gray-400">市值 = 各批單位數 × 現價</span>
+                                    <span class="text-xs text-gray-400">市值 = 各批單位數 × 現價；盈虧 = 價差 + 派息</span>
                                 </div>
+                                ${(g.dividends && g.dividends.length) ? `<div class="text-xs text-gray-600"><strong>派息紀錄：</strong> ${g.dividends.slice(0,8).map(dv => dv.date + ' $' + Number(dv.amount).toFixed(2)).join('　')}${g.dividends.length > 8 ? ' …' : ''}</div>` : ''}
                                 <table class="w-full text-xs">
                                     <thead class="text-gray-500">
                                         <tr>
@@ -1330,6 +1359,7 @@
                                             <th class="p-1 text-right">單位</th>
                                             <th class="p-1 text-right">天</th>
                                             <th class="p-1 text-right">市值</th>
+                                            <th class="p-1 text-right">派息</th>
                                             <th class="p-1 text-right">盈虧</th>
                                             <th class="p-1 text-right">年化%</th>
                                             <th class="p-1 text-right">活期息</th>
@@ -1349,6 +1379,7 @@
                                                 <td class="p-1 text-right">${unitsStr}</td>
                                                 <td class="p-1 text-right">${lot.days}</td>
                                                 <td class="p-1 text-right">${money(lot.currentValue)}</td>
+                                                <td class="p-1 text-right text-amber-700">${money(lot.dividend || 0)}</td>
                                                 <td class="p-1 text-right ${lPn}">${money(lot.fundProfit)}</td>
                                                 <td class="p-1 text-right ${lPn}">${Number(lot.fundAnnualized).toFixed(2)}%</td>
                                                 <td class="p-1 text-right">${money(lot.savingsInterest)}</td>
@@ -1363,7 +1394,7 @@
                         </tr>`;
                     });
                 } else {
-                    openBody.innerHTML = '<tr><td colspan="12" class="p-4 text-center text-gray-500">暫無持倉基金</td></tr>';
+                    openBody.innerHTML = '<tr><td colspan="13" class="p-4 text-center text-gray-500">暫無持倉基金</td></tr>';
                 }
 
                 const closedBody = document.getElementById('fundClosedTable');
@@ -1379,6 +1410,7 @@
                             <td class="p-2 text-right">${money(row.invest)}</td>
                             <td class="p-2 text-right">${money(row.sellAmount)}</td>
                             <td class="p-2 text-right">${row.days}</td>
+                            <td class="p-2 text-right text-amber-700">${money(row.dividend || 0)}</td>
                             <td class="p-2 text-right ${pnlCls} font-bold">${money(row.fundProfit)}</td>
                             <td class="p-2 text-right ${pnlCls}">${Number(row.fundAnnualized || 0).toFixed(2)}%</td>
                             <td class="p-2 text-right text-gray-600">${money(row.savingsInterest)}</td>
@@ -1387,7 +1419,7 @@
                         </tr>`;
                     });
                 } else {
-                    closedBody.innerHTML = '<tr><td colspan="11" class="p-4 text-center text-gray-500">暫無已賣出紀錄</td></tr>';
+                    closedBody.innerHTML = '<tr><td colspan="12" class="p-4 text-center text-gray-500">暫無已賣出紀錄</td></tr>';
                 }
             }).catch(() => alert('網路錯誤'));
         }
@@ -1512,9 +1544,36 @@
             });
         }
 
-        // 基金買入日期預設今天
+        function submitFundDividend() {
+            const name = (document.getElementById('divFundName').value || '').trim();
+            const date = document.getElementById('divDate').value;
+            const amount = parseFloat(document.getElementById('divAmount').value);
+            if (!name || !date || isNaN(amount) || amount === 0) {
+                alert('請填寫基金名稱、派息日期與金額');
+                return;
+            }
+            fetch(GOOGLE_APP_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'addFundDividend',
+                    log: { name: name, date: date, amount: amount, memo: document.getElementById('divMemo').value || '' }
+                })
+            }).then(res => res.json()).then(res => {
+                if (res.success) {
+                    alert('✅ ' + res.message);
+                    document.getElementById('divAmount').value = '';
+                    document.getElementById('divMemo').value = '';
+                    fetchFundData();
+                } else alert('❌ ' + (res.message || res.error));
+            }).catch(() => alert('網路錯誤'));
+        }
+
+        // 基金買入／派息日期預設今天
         if (document.getElementById('fundBuyDate')) {
             document.getElementById('fundBuyDate').valueAsDate = new Date();
+        }
+        if (document.getElementById('divDate')) {
+            document.getElementById('divDate').valueAsDate = new Date();
         }
     </script>
 </body>
